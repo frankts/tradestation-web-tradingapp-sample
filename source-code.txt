@@ -1,0 +1,75 @@
+using elsystem.windows.forms;
+using elsystem.drawing;
+
+vars:
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample"),
+	Form mainForm(null),
+	WebBrowser web(null),
+	ProgressBar progress(null);
+	
+// Method called on AnalysisTechnique Initialized event.
+// The sender parameter identifies the object that fires the event.
+// The args parameter contains additional information about the event.
+// NOTE:  Do not modify the method name, return type, or input parameters.
+
+method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) 
+begin
+	web = WebBrowser.Create(100, 100);
+	web.Dock = DockStyle.fill;
+	
+	progress = ProgressBar.Create(1,8);
+	progress.Dock = DockStyle.bottom;
+	progress.Maximum = 0;
+	progress.Maximum = 100;
+	progress.Value = 100;	
+
+	mainForm = Form.Create("WebTradingAppForm", 100, 100);
+	mainForm.Dock = DockStyle.right;
+	
+	mainForm.AddControl(progress);
+	mainForm.AddControl(web);	
+	
+	web.AllowWebBrowserDrop = false;
+	web.ScriptErrorsSuppressed = true;
+	web.Navigate(url);
+	
+	mainForm.Show();
+	
+	web.DocumentCompleted += web_DocumentCompleted;
+	web.ProgressChanged += web_ProgressChanged;
+	web.Navigating += web_Navigating;
+	
+	progress.Visible = false;
+	
+end;
+
+method void refresh_click( elsystem.Object sender, elsystem.EventArgs args )
+begin
+   web.Refresh();
+end;
+
+method void back_click( elsystem.Object sender, elsystem.EventArgs args )
+begin
+	web.GoBack();
+end;
+
+method void web_Navigating( elsystem.Object sender, elsystem.windows.forms.WebBrowserNavigatingEventArgs args )
+begin
+	progress.Visible = true;
+end;
+
+method void web_DocumentCompleted (elsystem.Object sender, elsystem.windows.forms.WebBrowserDocumentCompletedEventArgs args )
+begin
+	progress.Visible = false;
+end;
+
+method void web_ProgressChanged ( elsystem.Object sender, elsystem.EventArgs args )
+var:
+	elsystem.windows.forms.WebBrowserProgressChangedEventArgs progArgs;
+begin	
+	progArgs = args astype elsystem.windows.forms.WebBrowserProgressChangedEventArgs;
+		
+	progress.Minimum = 0;
+	progress.Maximum = progArgs.MaximumProgress;
+	progress.Value = progArgs.CurrentProgress;
+end;
