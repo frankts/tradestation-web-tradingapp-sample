@@ -7,11 +7,6 @@ vars:
 	WebBrowser web(null),
 	ProgressBar progress(null);
 	
-// Method called on AnalysisTechnique Initialized event.
-// The sender parameter identifies the object that fires the event.
-// The args parameter contains additional information about the event.
-// NOTE:  Do not modify the method name, return type, or input parameters.
-
 method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) 
 begin
 	web = WebBrowser.Create(100, 100);
@@ -31,7 +26,7 @@ begin
 	
 	web.AllowWebBrowserDrop = false;
 	web.ScriptErrorsSuppressed = true;
-	web.Navigate(url);
+	web.Navigate(url + "?default_account=" + AccountsProvider1.Account[1].AccountID);
 	
 	mainForm.Show();
 	
@@ -43,20 +38,15 @@ begin
 	
 end;
 
-method void refresh_click( elsystem.Object sender, elsystem.EventArgs args )
-begin
-   web.Refresh();
-end;
-
-method void back_click( elsystem.Object sender, elsystem.EventArgs args )
-begin
-	web.GoBack();
-end;
-
 method void web_Navigating( elsystem.Object sender, elsystem.windows.forms.WebBrowserNavigatingEventArgs args )
+var: int hashLocation, int startLocation;
 begin
-	progress.Visible = true;
+	progress.Visible = true; 
+		
+	BuildOrderTicketFromURLHash(args.Url);
+	
 end;
+
 
 method void web_DocumentCompleted (elsystem.Object sender, elsystem.windows.forms.WebBrowserDocumentCompletedEventArgs args )
 begin
@@ -72,4 +62,80 @@ begin
 	progress.Minimum = 0;
 	progress.Maximum = progArgs.MaximumProgress;
 	progress.Value = progArgs.CurrentProgress;
+
+end;
+
+//--------------------------------------------------------------------------------
+// BuildOrderTicketFromURLHash looks for a # in a URL in order to determine if 
+// it should parse the string. It will build an OrderTicket object based on the
+// defined identifiers and delimiters.
+//--------------------------------------------------------------------------------
+method void BuildOrderTicketFromURLHash(string URL)
+var: int hashLocation, int rightLocation, string fields, string field;
+begin
+	hashLocation = instr( URL, "#");
+	
+	if hashLocation > 0 then 
+	begin
+		rightLocation = strlen(URL) - hashLocation;	
+			
+		if rightLocation > 0 then
+		begin
+			fields = rightstr(URL, rightLocation);
+			
+			if strlen(FindField(fields, "ACCOUNT=", ";")) > 0 then
+			begin
+				print(fields);
+				
+				field = FindField(fields, "SYM=", ";");
+				
+				if strlen(field) > 0 then
+					OrderTicket1.Symbol = field; 
+					
+				field = FindField(fields, "ACCOUNT=", ";");
+				
+				if strlen(field) > 0 then
+					OrderTicket1.Account = field;
+					
+				field = FindField(fields, "QTY=", ";");
+				
+				if strlen(field) > 0 then
+					OrderTicket1.Quantity = strtonum(field);	
+					
+				field = FindField(fields, "ACTION=", ";");
+				
+				if strlen(field) > 0 then
+				begin				
+					if field = "buy" then
+						OrderTicket1.Action = tsdata.trading.OrderAction.buy;	
+					if field = "sell" then
+    					OrderTicket1.Action = tsdata.trading.OrderAction.sell;				
+				end;
+				
+				OrderTicket1.Send();	
+			end;	
+		end; 
+	end;
+end;
+
+//--------------------------------------------------------------------------------
+// FindField will extract text from a string given an identifier and a delimiter
+//--------------------------------------------------------------------------------
+method string FindField(string fields, string identifier, string delimiter)
+var: string field, int fieldLocation, int delimiterLocation;
+begin
+	fieldLocation = instr( fields, identifier );
+				
+	if fieldLocation > 0 then
+	begin
+		field = rightstr( fields, strlen(fields) - (fieldLocation + strlen(identifier) - 1));
+		delimiterLocation = instr( field, delimiter );
+		
+		if delimiterLocation > 0 then
+		begin			
+			field = leftstr(field, delimiterLocation - 1);		
+		end;
+	end;
+	
+	return field;
 end;
