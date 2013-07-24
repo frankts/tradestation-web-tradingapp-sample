@@ -107,7 +107,7 @@ begin
 				if strlen(field) > 0 then
 				begin				
 					if field = "buy" then
-						OrderTicket1.Action = tsdata.trading.OrderAction.buy;	
+					OrderTicket1.Action = tsdata.trading.OrderAction.buy;	
 					if field = "sell" then
     					OrderTicket1.Action = tsdata.trading.OrderAction.sell;				
 				end;
