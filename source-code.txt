@@ -1,56 +1,113 @@
+//-----------------------------------------------------------------------------
+// Sample Web TradingApp
+//
+// The Sample Web TradingApp illustrates the ability for a TradingApp to host 
+// a web browser and interact with EasyLanguage using hashtags in the url and 
+// javascript function calls.
+//
+// We are working on providing support for direct javascript calls from 
+// EasyLanguage as well as the ability to call EasyLanguage methods from 
+// javascript. Until then, this example responds to the web browser's Navigating 
+// event for input from the html document while leveraging the Navigate method 
+// to execute javascript.
+//
+// It is important to note that calling WebBrowser.Navigate multiple times will
+// not execute your javascript correctly. It will only execute the last call made.
+// In order to ensure that all javascript calls are made, a set of functions have 
+// been created called AddToJSQueue and ProcessJSQueue. You can call AddToJSQueue 
+// as many times as you would like followed by a call to ProcessJSQueue. If the 
+// queue is too large to process, the code will break up the queue into multiple 
+// pieces until all items are processed.
+//-----------------------------------------------------------------------------
+
 using elsystem.windows.forms;
 using elsystem.drawing;
+using elsystem.collections;
+ 
+input: string iSymbol( "EURUSD" ); 
+
+const: int MAX_URL_SIZE(2083), int MAX_JS_PREFIX(12);
 
 vars:
-	String url("http://frankts.github.io/tradestation-web-tradingapp-sample"),
-	Form mainForm(null),
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample"),  
+	Form mainForm(null), 
 	WebBrowser web(null),
+	Dictionary accountsDictionary(null),
+	Queue jsQueue(null),
+	intrabarpersist bool jsIsProcessing(false),
 	ProgressBar progress(null);
 	
 method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) 
+var: int x;
 begin
 	web = WebBrowser.Create(100, 100);
 	web.Dock = DockStyle.fill;
 	
-	progress = ProgressBar.Create(1,8);
+	progress = ProgressBar.Create(1,8); 
 	progress.Dock = DockStyle.bottom;
 	progress.Maximum = 0;
 	progress.Maximum = 100;
 	progress.Value = 100;	
 
-	mainForm = Form.Create("WebTradingAppForm", 100, 100);
+	mainForm = Form.Create("WebTradingAppForm", 100, 100); 
 	mainForm.Dock = DockStyle.right;
 	
 	mainForm.AddControl(progress);
-	mainForm.AddControl(web);	
+	mainForm.AddControl(web);	 
 	
 	web.AllowWebBrowserDrop = false;
-	web.ScriptErrorsSuppressed = true;
-	web.Navigate(url + "?default_account=" + AccountsProvider1.Account[1].AccountID);
+	web.ScriptErrorsSuppressed = false;
+	web.Navigate(url);
 	
 	mainForm.Show();
 	
 	web.DocumentCompleted += web_DocumentCompleted;
 	web.ProgressChanged += web_ProgressChanged;
-	web.Navigating += web_Navigating;
+	web.Navigating += web_Navigating; 
 	
-	progress.Visible = false;
+	progress.Visible = false;  
+
+	accountsDictionary = Dictionary.Create();	
 	
+	jsQueue = Queue.Create();	
+	accountsDictionary.Clear();
+	
+	For x = 0 to AccountsProvider1.Count - 1 begin
+		accountsDictionary.Add("Account" + x.ToString(), AccountsProvider1.Account[x].AccountID);
+	end;
+	
+	// Example of sending a JSON formatted parameter to a javascript function
+	AddToJSQueue("accountList(" + DictionaryToJSON(accountsDictionary) + ");");
+	
+	// Example of a simple javascript call
+	AddToJSQueue("updateSymbol('" + QuotesProvider1.Symbol.ToString() + "');");
+	
+	ProcessJSQueue();
+	
+end;
+
+method void QuotesProvider1_Updated( elsystem.Object sender, tsdata.marketdata.QuoteUpdatedEventArgs args ) 
+var: String jscriptText;
+begin	
+	jscriptText = ""; 
+	
+	If args.Field = "Last" then
+	begin
+		AddToJSQueue("updateLast(" + args.Quote.DoubleValue.ToString() + ");");
+		ProcessJSQueue();;
+	end;	
 end;
 
 method void web_Navigating( elsystem.Object sender, elsystem.windows.forms.WebBrowserNavigatingEventArgs args )
 var: int hashLocation, int startLocation;
-begin
+begin  
 	progress.Visible = true; 
-		
-	BuildOrderTicketFromURLHash(args.Url);
 	
-end;
-
-
-method void web_DocumentCompleted (elsystem.Object sender, elsystem.windows.forms.WebBrowserDocumentCompletedEventArgs args )
-begin
-	progress.Visible = false;
+	// Example of parsing a hashtag # from a url		  
+	BuildOrderTicketFromURLHash(args.Url);	
+	
+	// Logic to process the javascript queue until empty
+	AttemptToProcessJSQueue(args.Url);	
 end;
 
 method void web_ProgressChanged ( elsystem.Object sender, elsystem.EventArgs args )
@@ -65,12 +122,17 @@ begin
 
 end;
 
+method void web_DocumentCompleted (elsystem.Object sender, elsystem.windows.forms.WebBrowserDocumentCompletedEventArgs args )
+begin
+	progress.Visible = false;
+end;
+
 //--------------------------------------------------------------------------------
 // BuildOrderTicketFromURLHash looks for a # in a URL in order to determine if 
 // it should parse the string. It will build an OrderTicket object based on the
 // defined identifiers and delimiters.
 //--------------------------------------------------------------------------------
-method void BuildOrderTicketFromURLHash(string URL)
+method void BuildOrderTicketFromURLHash(string URL) 
 var: int hashLocation, int rightLocation, string fields, string field;
 begin
 	hashLocation = instr( URL, "#");
@@ -112,7 +174,9 @@ begin
     						OrderTicket1.Action = tsdata.trading.OrderAction.sell;				
 				end;
 				
-				OrderTicket1.Send();	
+				OrderTicket1.Send();
+				
+				print("Order sent - " + fields);
 			end;	
 		end; 
 	end;
@@ -138,4 +202,119 @@ begin
 	end;
 	
 	return field;
+end;
+ 
+//--------------------------------------------------------------------------------
+// Given a Dictionary, this function will return a JSON string and will 
+// recursively look for Dictionaries nested within Dictionaries and expose its
+// content.
+//--------------------------------------------------------------------------------
+method string DictionaryToJSON( Dictionary dict )   
+var: string jsonResult, int x;
+begin
+	jsonResult = "";
+	jsonResult += "{";
+	
+	For x = 0 to dict.Keys.Count - 1 begin
+		If x > 0 then
+			jsonResult += ","; 
+			
+		if dict.Items[dict.Keys[x].ToString()] istype Dictionary then
+		begin
+			jsonResult += "'" + dict.Keys[x].ToString() + "'" + ":" + DictionaryToJSON(dict.Items[dict.Keys[x].ToString()] astype Dictionary);
+		end
+		else 
+		begin
+			jsonResult += "'" + dict.Keys[x].ToString() + "'" + ":" + "'" + dict.Items[dict.Keys[x].ToString()].ToString() + "'";
+		end;
+	end;
+	
+	jsonResult += "}";
+	
+	return jsonResult;
+end;  
+
+//--------------------------------------------------------------------------------
+// Add javascript to the queue and process. 
+//--------------------------------------------------------------------------------
+method void AddToJSQueue( string js )
+begin
+	jsQueue.Enqueue(js);
+end;  
+
+//--------------------------------------------------------------------------------
+// ProcessJSQuote will attempt to process all items in the javascript queue that
+// fit within the Navigate functions parameter. Microsoft states that a url can
+// only contain up to 2083 characters http://support.microsoft.com/kb/208427 and 
+// this method will properly trim the url and continue processing until the 
+// queue is empty.
+//--------------------------------------------------------------------------------
+method void ProcessJSQueue()
+var: string jsText;
+begin
+	if jsIsProcessing = false then
+	begin
+		jsText = "javascript:";
+		
+		If (jsQueue.Count > 0) and (strlen(jsQueue.Peek() astype String) > MAX_URL_SIZE) then
+		begin
+			print("Your javascript function call is larger than MAX_URL_SIZE! Removing the call from the queue.");
+			jsQueue.Dequeue();
+		end;
+
+		While (jsQueue.Count > 0) and (strlen(jsText + jsQueue.Peek() astype String) <= MAX_URL_SIZE) Begin
+ 			jsText += jsQueue.Dequeue() astype String;
+		End;
+		
+		if strlen(jsText) > MAX_JS_PREFIX then
+		begin
+			jsIsProcessing = true;
+			web.Navigate(jsText); 
+			
+			print("---------------- javascript call ----------------");
+			print(jsText);
+			print(jsQueue.Count.ToString() + " still in queue.");
+			print("-------------------------------------------------");
+		end;	
+	end
+	Else
+		print("Processing javascript, please wait...");
+end;
+
+//--------------------------------------------------------------------------------
+// Clear the queue
+//--------------------------------------------------------------------------------
+method void ClearJSQueue()
+begin
+	jsQueue.Clear();
+	jsIsProcessing = false;
+	print("Clearing queue.");
+end; 
+
+//--------------------------------------------------------------------------------
+// Check if the url param is a javascript url
+//--------------------------------------------------------------------------------
+method bool IsJSUrl(string url)
+begin
+	return (instr(url, "javascript:") = 1); 
+end;
+
+//--------------------------------------------------------------------------------
+// Checks to see if there are any items in the queue that need to be sent to the
+// web browser.
+//--------------------------------------------------------------------------------
+method void AttemptToProcessJSQueue(string url)
+begin
+	if IsJSUrl(url) then
+	begin
+		If jsIsProcessing = true and jsQueue.Count > 0 then
+			print("processing items in queue...");
+			
+		jsIsProcessing = false; 
+		ProcessJSQueue();
+	end
+	else
+	begin
+		ClearJSQueue();
+	end;
 end;
