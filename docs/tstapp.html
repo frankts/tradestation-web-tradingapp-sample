@@ -1,0 +1,856 @@
+<!DOCTYPE html />
+
+<html>
+<head>
+	<title>tstapp.js</title>
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+	<link href="nocco.css" rel="stylesheet" media="all" type="text/css" />
+	<script src="prettify.js" type="text/javascript"></script>
+</head>
+<body onload="prettyPrint()">
+	<div id="container">
+		<div id="background"></div>
+		<table cellpadding="0" cellspacing="0">
+			<thead>
+				<tr>
+					<th class="docs">
+						<h1>tstapp.js</h1>
+					</th>
+					<th class="code"></th>
+				</tr>
+			</thead>
+			<tbody>
+					<tr id="section_1">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_1">&#182;</a>
+							</div>
+							<h1>TradeStation TradingApp WebApp</h1>
+
+<p>This javascript library illustrates the ability to host a Web App in a TradingApp using Javascript.
+It is meant as an example that helps Web App developers access portions
+of the EasyLanguage API. With this API you can place orders, access order
+history, reference position informations and more.</p>
+
+<p>Some things to keep in mind...</p>
+
+<ul>
+<li>This examples is based on functionality available as of <strong>TradeStation 9.1 Update 24</strong></li>
+<li>All <code>_properties</code> or methods with underscores should be consider as private and can change over time.</li>
+<li>The current implementation relies on the URL/URI to communicate via <code>#</code> hashtags and <code>javascript:</code> to and from EasyLanguage, therefore it is important to be aware of any changes to the URL/URI originating from the web page. Changing the URL can cause your web app to omit event driven data since subsequent changes to a URL will cancel each other out and only process the last change.</li>
+<li>This library requires jQuery. It is recommended that you use <a href="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js">jQuery 1.10.2</a></li>
+</ul>
+
+<hr />
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>var TradingApp = {	
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_2">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_2">&#182;</a>
+							</div>
+							<p><code>TradingApp</code> is a singleton object which is the namespace for the library.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>	
+	init: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_3">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_3">&#182;</a>
+							</div>
+							<p><code>init</code> is required and will setup your Web App with a blank order ticket and <code>Accounts</code>, <code>Orders</code>, and <code>Positions</code> information.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_4">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_4">&#182;</a>
+							</div>
+							<p>This timeout is added in order to work around a delay in receiving events in a TradingApp Web Brower window. (some events are missed)</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>		setTimeout(function() {  
+			var _parent = TradingApp;
+
+			_parent.Positions.request();
+			_parent._HashtagQueue.init();
+			_parent.Accounts.request();
+			_parent.Orders.request();			
+			_parent.Orders.Ticket.request();			
+		}, 1000);
+	},
+
+	Accounts: {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_5">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_5">&#182;</a>
+							</div>
+							<p><code>Accounts</code> provide a list of accounts that can be accessed as either an array or a map.</p>
+
+<p>Events:</p>
+
+<p><em>e.g. $(TradingApp.Accounts).bind("onUpdate", function( reason, accountID){});</em></p>
+
+<ul>
+<li>onUpdate(reason, accountID)</li>
+<li>onStatus(newState, oldState)</li>
+</ul>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>		request: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_6">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_6">&#182;</a>
+							</div>
+							<p><code>request</code> requests, asynchronously, the current list of accounts. </p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var _parent = this;
+
+			TradingApp._call( function() { window.location.href = _parent._hashes._items; } );
+		},
+
+		items: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_7">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_7">&#182;</a>
+							</div>
+							<p><code>items</code> provides an array of accounts.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var result = [];
+
+			for( var accountID in this._items)
+				result.push(this._items[accountID]);
+			
+			return result;
+		},
+
+		item: function(accountID) {	
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_8">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_8">&#182;</a>
+							</div>
+							<p><code>item</code> provides a way to lookup accounts by AccountID.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			return _items[accountID];
+		},
+
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_9">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_9">&#182;</a>
+							</div>
+							<p><em>private members</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+		_items: {},
+
+		_hashes: {
+			_items: &quot;#AP:AN=ITEMS;&quot;
+		},	
+
+		delegates: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_10">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_10">&#182;</a>
+							</div>
+							<p><em><code>delegates</code> provide a callback mechanism for EasyLanguage. These methods are considered private and should not be called directly.</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var _parent = this;
+
+			return {
+
+				add: function(accountID, accountItem) {	
+
+					var account = _parent._items[accountID];
+
+					if(account == null) 
+						_parent._items[accountID] = accountItem;
+					else 
+						_parent.delegates().extend(accountID, accountItem);
+				},
+
+				extend: function(accountID, accountItem) {
+
+					var account = _parent._items[accountID];
+
+					if(account)
+						$.extend(account, accountItem);
+					else
+						_parent.delegates().add(accountID, accountItem);
+				},
+
+				clear: function()
+				{
+					_parent._items = {};
+				},
+
+				next: function()
+				{
+					TradingApp._next();
+				},
+
+				update: function(reason, accountID) {
+					$(TradingApp.Accounts).trigger(&quot;onUpdate&quot;, [reason, accountID]);
+				},
+
+				status: function(newState, oldState) {
+					$(TradingApp.Accounts).trigger(&quot;onStatus&quot;, [newState, oldState]);
+				}
+			};
+		}	
+	},
+
+	Orders: {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_11">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_11">&#182;</a>
+							</div>
+							<p><code>Orders</code> provide a list of orders placed for the current day.</p>
+
+<p>Events:</p>
+
+<p><em>e.g. $(TradingApp.Orders).bind("onUpdate", function( reason ){});</em></p>
+
+<ul>
+<li>onUpdate(reason)</li>
+</ul>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>		request: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_12">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_12">&#182;</a>
+							</div>
+							<p><code>request</code> requests, asynchronously, the current list of orders.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			TradingApp._call( function() { window.location.href = TradingApp.Orders._hashes._orders; } );
+		},
+
+		cancel: function(orderID){
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_13">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_13">&#182;</a>
+							</div>
+							<p><code>cancel</code> cancels the order specified by the OrderID.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			TradingApp._call( function() { window.location.href = TradingApp.Orders._hashes._cancel_order + orderID + &quot;;&quot;; } );
+		},
+
+		items: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_14">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_14">&#182;</a>
+							</div>
+							<p><code>items</code> provides an array of orders.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var result = [];
+
+			for( var orderID in this._items)
+				result.push(this._items[orderID]);
+			
+			return result;
+		},
+
+		item: function(orderID){
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_15">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_15">&#182;</a>
+							</div>
+							<p><code>item</code> provides a way to lookup accounts by OrderID.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			return _items[orderID];
+		},		
+
+		Ticket: {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_16">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_16">&#182;</a>
+							</div>
+							<p><code>Orders.Ticket</code> provide an order ticket to send orders to TradeStation's order execution system.</p>
+
+<p>Events:</p>
+
+<p><em>e.g. $(TradingApp.Orders.Ticket).bind("onLoad", function( ticket ){});</em></p>
+
+<ul>
+<li>onLoad(ticket)    </li>
+<li>OnSend(ticket)            </li>
+</ul>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			ticket: {},
+
+			request: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_17">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_17">&#182;</a>
+							</div>
+							<p><code>request</code> requests, asynchronously, the order ticket cached in the TradingApp. Changes to the ticket will be maintained until the EasyLangauge Tradingapp is reloaded.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>				var _parent = this;
+
+				TradingApp._call( function() { window.location.href = TradingApp.Orders._hashes._ticket; } );
+			},
+
+			send: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_18">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_18">&#182;</a>
+							</div>
+							<p><code>send</code> sends an order, asynchronously, based on the values specified in the order ticket.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>				var _parent = this;
+
+				TradingApp._call( function() { 
+					var location = TradingApp.Orders._hashes._send_ticket + JSON.stringify(_parent.ticket) + &quot;;&quot;;
+					window.location.href = location; 
+				} );
+			},
+
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_19">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_19">&#182;</a>
+							</div>
+							<p><em>private members</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+			delegates: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_20">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_20">&#182;</a>
+							</div>
+							<p><em><code>delegates</code> provide a callback mechanism for EasyLanguage. These methods are considered private and should not be called directly.</em>               </p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>				var _parent = this;
+
+				return {
+
+					extend: function(ticket)
+					{
+						$.extend(_parent.ticket, ticket);
+					},
+
+					next: function()
+					{
+						TradingApp._next();
+					},
+
+					load: function() {
+						$(TradingApp.Orders.Ticket).trigger(&quot;onLoad&quot;, [_parent.ticket]);
+					},
+
+					send: function() {
+						$(TradingApp.Orders.Ticket).trigger(&quot;onSend&quot;, [_parent.ticket]);
+					}
+				};
+			}			
+
+		},
+
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_21">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_21">&#182;</a>
+							</div>
+							<p><em>private members</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+		delegates: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_22">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_22">&#182;</a>
+							</div>
+							<p><em><code>delegates</code> provide a callback mechanism for EasyLanguage. These methods are considered private and should not be called directly.</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var _parent = this;
+
+			return {
+
+				add: function(orderID, orderItem) {	
+
+					_parent._items[orderID] = orderItem;
+				},
+
+				extend: function(orderID, orderItem) {
+
+					var order = _parent._items[orderID];
+
+					if(order)
+					{
+						$.extend(order, orderItem);
+					}
+				},
+
+				remove: function(orderID) {
+
+					if(_parent._items[orderID] != null)
+					{
+						delete _parent._items[orderID];
+					}
+				},
+
+				clear: function() {
+
+					_parent._items = {};
+				},
+
+				next: function() {
+
+					TradingApp._next();
+				},
+
+				update: function(reason, orderID) {
+					$(TradingApp.Orders).trigger(&quot;onUpdate&quot;, [reason, orderID]);
+				},
+
+				state: function(newState, oldState) {
+					$(TradingApp.Orders).trigger(&quot;onState&quot;, [newState, oldState]);
+				}				
+			};
+		},
+
+		_items: {},
+
+		_hashes: {
+			_ticket: &quot;#OT:AN=LOAD;&quot;,
+			_send_ticket: &quot;#OT:AN=SEND;TK=&quot;,
+			_orders: &quot;#OP:AN=LOAD;&quot;,
+			_cancel_order: &quot;#OP:AN=CANCEL;ID=&quot;
+		}
+	},
+
+	Positions: {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_23">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_23">&#182;</a>
+							</div>
+							<p><code>Positions</code> provide a list of open positions.</p>
+
+<p>Events:</p>
+
+<p><em>e.g. $(TradingApp.Positions).bind("onUpdate", function( reason ){});</em></p>
+
+<ul>
+<li>onUpdate(reason)</li>
+</ul>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+		request: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_24">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_24">&#182;</a>
+							</div>
+							<p><code>request</code> requests, asynchronously, the current list of positions.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			TradingApp._call( function() { window.location.href = TradingApp.Positions._hashes._items; } );
+		},
+
+		items: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_25">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_25">&#182;</a>
+							</div>
+							<p><code>items</code> provides an array of positions by account and symbol.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var result = [];
+
+			for( var positionID in this._items)
+				result.push(this._items[positionID]);
+			
+			return result;
+		},
+
+		item: function(positionID){
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_26">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_26">&#182;</a>
+							</div>
+							<p><code>item</code> provides a way to lookup position by a pseudo PositionID (account_symbol).</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			return _items[positionID];
+		},		
+
+		close: function(positionID){
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_27">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_27">&#182;</a>
+							</div>
+							<p><code>close</code> places an order to close the position.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			TradingApp._call( function() { window.location.href = TradingApp.Positions._hashes._close + positionID + &quot;;&quot;; } );
+		},
+
+		delegates: function() {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_28">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_28">&#182;</a>
+							</div>
+							<p><em><code>delegates</code> provide a callback mechanism for EasyLanguage. These methods are considered private and should not be called directly.</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>			var _parent = this;
+
+			return {
+
+				add: function(positionID, positionItem) {	
+
+					var position = _parent._items[positionID];
+
+					if(position == null) 
+						_parent._items[positionID] = positionItem;
+					else 
+						_parent.delegates().extend(positionID, positionItem);
+				},
+
+				extend: function(positionID, positionItem) {
+
+					var position = _parent._items[positionID];
+
+					if(position)
+						$.extend(position, positionItem);
+					else
+						_parent.delegates().add(positionID, positionItem);
+				},
+
+				remove: function(positionID) {
+
+					if(_parent._items[positionID] != null)
+					{
+						delete _parent._items[positionID];
+					}
+				},
+
+				clear: function()
+				{
+					_parent._items = {};
+				},
+
+				next: function()
+				{
+					TradingApp._next();
+				},
+
+				update: function(reason, positionID) {
+					$(TradingApp.Positions).trigger(&quot;onUpdate&quot;, [reason, positionID]);
+				}
+			};
+		},
+
+		_items: {},
+
+		_hashes: {
+			_items: &quot;#PP:AN=LOAD;&quot;,
+			_close: &quot;#PP:AN=CLOSE;ID=&quot;
+		}
+	},
+
+	_HashtagQueue: {
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_29">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_29">&#182;</a>
+							</div>
+							<p><em><code>_HashtagQueue</code> is used to ensure that requests do not invalidate each other by only working one request at a time. This is temporary until we implement a native JavaScript callback to EasyLangauge.</em></p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>		_queue: [],
+		isProcessing: false,
+
+		add: function(fn) {
+			this._queue.push(fn);
+		},
+
+		process: function() {
+			if(this.isProcessing == false)
+			{
+				var fn = null;
+
+				if(this._queue.length &gt; 0)
+					fn = this._queue.shift();
+
+				if(fn != null)
+				{
+					fn();
+					$(&quot;#eventsContent&quot;).append(&quot;process queue:&quot; + this._queue.length.toString() + &quot;&lt;br/&gt;&quot;);
+					this.isProcessing = true;
+				}				
+			}
+		},
+
+		next: function() {
+			this.isProcessing = false;
+			this.process();
+		},
+
+		init: function() {
+		}
+	},
+
+	_call: function(fn) {
+		this._HashtagQueue.add(fn);
+		this._HashtagQueue.process();
+	},
+
+	_next: function() {
+		this._HashtagQueue.next();
+	}	
+};
+
+function taPPtest(a,b){
+	$(&quot;#eventsContent&quot;).append(&quot;Testing Invoke &lt;br/&gt;&quot;);
+}
+
+function taPPadd(positionID, positionItem) {
+	alert(positionID);
+	TradingApp.Positions.delegates().add(positionID, positionItem);
+};
+
+function taPPupdate(reason, positionItem) {
+	TradingApp.Positions.delegates().update(reason);
+};
+
+
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_30">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_30">&#182;</a>
+							</div>
+							<p>The MIT License (MIT)</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_31">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_31">&#182;</a>
+							</div>
+							<p>Copyright (c) 2013 TradeStation Technologies, Inc.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_32">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_32">&#182;</a>
+							</div>
+							<p>Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_33">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_33">&#182;</a>
+							</div>
+							<p>The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+</code></pre>
+						</td>
+					</tr>
+					<tr id="section_34">
+						<td class="docs">
+							<div class="pilwrap">
+								<a class="pilcrow" href="#section_34">&#182;</a>
+							</div>
+							<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+
+						</td>
+						<td class="code">
+							<pre><code class='prettyprint'>
+        
+          
+</code></pre>
+						</td>
+					</tr>
+			</tbody>
+		</table>
+	</div>
+</body>
+</html>
