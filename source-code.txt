@@ -1,50 +1,28 @@
 //-----------------------------------------------------------------------------
-// Sample Web TradingApp
+// Sample Web TradingApp 
 //
 // This sample illustrates the ability for a web browser to interact with 
 // EasyLanguage using hashtags in the url and javascript function calls.
-//
-// We are working on providing support for direct javascript calls from 
-// EasyLanguage as well as the ability to call EasyLanguage methods from 
-// javascript. Until then, this example responds to the web browser's Navigating 
-// event for input from the html document while leveraging the Navigate method 
-// to execute javascript.
-//
-// It is important to note that calling WebBrowser.Navigate multiple times will
-// not execute your javascript correctly. It will only execute the last call made.
-// In order to ensure that all javascript calls are made, a set of functions have 
-// been created called AddToJSQueue and ProcessJSQueue. You can call AddToJSQueue 
-// as many times as you would like followed by a call to ProcessJSQueue. If the 
-// queue is too large to process, the code will break up the queue into multiple 
-// pieces until all items are processed.
 //-----------------------------------------------------------------------------
 
 using elsystem.windows.forms;
 using elsystem.drawing;
 using elsystem.collections;
  
-const: int MAX_URL_SIZE(500), 
-	   int MAX_JS_PREFIX(12);
-
 vars:
-	String url("http://frankts.github.io/tradestation-web-tradingapp-sample"),  
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v1"),  
 	Form mainForm(null), 
 	WebBrowser web(null),
-	Dictionary accountsDictionary(null),
-	Queue jsQueue(null),
-	string prevJSQueueItem(""),
-	intrabarpersist bool jsIsProcessing(false),
 	ProgressBar progress(null),
 	bool displayDebugInfo(false),
-	string JS_AP_CALLBACK("TradingApp.Accounts.delegates()"),
-	string JS_OT_CALLBACK("TradingApp.Orders.Ticket.delegates()"),
-	string JS_OP_CALLBACK("TradingApp.Orders.delegates()"),
-	string JS_PP_CALLBACK("TradingApp.Positions.delegates()");
+	string JS_AP_CALLBACK("TradingAppAccountsDelegate"),
+	string JS_OT_CALLBACK("TradingAppOrdersTicketDelegate"),
+	string JS_OP_CALLBACK("TradingAppOrdersDelegate"),
+	string JS_PP_CALLBACK("TradingAppPositionsDelegate");
 	
 method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) 
 var: int x, Dictionary dict;
 begin
-	jsQueue = Queue.Create(); 
 	
 	web = WebBrowser.Create(100, 100);
 	web.Dock = DockStyle.fill;
@@ -87,13 +65,8 @@ begin
 		
 	progress.Visible = true; 
 	
-	if IsJSUrl(args.Url) or IsHashUrl(args.Url) then
-	begin
+	if IsHashUrl(args.Url) then
 		EvaluateURL(args.Url);	
-		EvaluateJSQueue(args.Url);
-	end
-	else
-		ClearJSQueue();
 end;
 
 method void web_ProgressChanged ( elsystem.Object sender, elsystem.EventArgs args )
@@ -192,9 +165,7 @@ begin
 		UpdateAccountsJS("items", "");	
 	end;
 	
-	AddToJSQueue(JS_AP_CALLBACK + ".next();");
-	
-	ProcessJSQueue();
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Next");
 end;
 
 method void JSOrderTicket(string fields)
@@ -213,9 +184,7 @@ begin
 			SendOrderTicketJS(OrderTicket1, field);
 	end; 
 	
-	AddToJSQueue(JS_OT_CALLBACK + ".next();");
-	
-	ProcessJSQueue();
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Next");
 end;
 
 method void JSOrdersProvider(string fields)  
@@ -238,7 +207,7 @@ begin
 			if order <> null then
 			begin
 				order.Cancel();
-				AddToJSQueue(JS_OP_CALLBACK + ".update('cancel');");
+				web.Document.InvokeScript(JS_OP_CALLBACK + "Update", "cancel");
 			end;
 		end;
 	end
@@ -257,15 +226,13 @@ begin
 				if strlen(field) > 0 then
 				begin	
 					order.Replace(DictionaryToReplaceTicket(JSONToDictionary(field), tsdata.trading.ReplaceTicket.Create()));					
-					AddToJSQueue(JS_OP_CALLBACK + ".update('replace');");
+					web.Document.InvokeScript(JS_OP_CALLBACK + "Update", "replace");
 				end;
 			end;
 		end;
 	end; 	
-	
-	AddToJSQueue(JS_OP_CALLBACK + ".next();");
-	
-	ProcessJSQueue();	
+
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Next");	
 end;
 
 method void JSPositionsProvider(string fields)
@@ -296,14 +263,12 @@ begin
 			if posObj <> null then
 			begin
 				posObj.Close();
-				AddToJSQueue(JS_PP_CALLBACK + ".update('close');");
+				web.Document.InvokeScript(JS_PP_CALLBACK + "Update", "close");
 			end;
 		end;
 	end;	
 
-	AddToJSQueue(JS_PP_CALLBACK + ".next();");
-	
-	ProcessJSQueue();	
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Next");	
 end;		
 
 //#############################################################################
@@ -317,35 +282,20 @@ end;
 method void UpdatePositionsJS(string reason)
 vars: int x, int y, Vector jsArr;
 begin 
-	AddToJSQueue(JS_PP_CALLBACK + ".clear();");  
+	
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Clear"); 
 
 	For x = 0 to PositionsProvider1.Count - 1 
 	begin
 		UpdatePositionJS( PositionsProvider1.Position[x], false); 
 	end;		 
-				
-	AddToJSQueue(JS_PP_CALLBACK + ".update('"+ reason + "');");
+	
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Update", "reason");
 end;
 
 method void UpdatePositionJS(tsdata.trading.Position posObj, bool extendOnly) 
-vars: int y, Vector jsArr;
 begin
-	// Reduce the max size by the additional information that could be passed as part of the string to navigate
-	jsArr = FlatDictionaryToVectorOfJSON(PositionToDictionary(posObj), MAX_URL_SIZE - (strlen(JS_PP_CALLBACK + ".extend('',);" + IDForPosition(posObj)) + MAX_JS_PREFIX + 2));
-
-	For y = 0 to jsArr.Count - 1 
-	begin
-				
-		if y = 0 and extendOnly = false then
-		begin
-			AddToJSQueue(JS_PP_CALLBACK + ".add(" + doublequote + IDForPosition(posObj) + doublequote + "," + jsArr[y].ToString() + ");");
-		end
-		else
-		begin
-			AddToJSQueue(JS_PP_CALLBACK + ".extend(" + doublequote + IDForPosition(posObj) + doublequote + "," + jsArr[y].ToString() + ");");
-		end;
-	end;
-
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Add", IDForPosition(posObj), DictionaryToJSON(PositionToDictionary(posObj)));
 end;
 
 method Dictionary PositionToDictionary(tsdata.trading.Position posObj)
@@ -371,9 +321,6 @@ begin
 	dict.Add("Symbol", posObj.Symbol);
 	dict.Add("SymbolType", posObj.SymbolType.ToString());
 	dict.Add("TotalCost", posObj.TotalCost);
-	
-	
-	
 		
 	return dict;
 
@@ -400,16 +347,14 @@ begin
 				return;
 				
 			case tsdata.trading.PositionUpdateReason.removed:
-				AddToJSQueue(JS_PP_CALLBACK + ".remove('" + IDForPosition(args.Position) + "');");
+				web.Document.InvokeScript(JS_PP_CALLBACK + "Remove", IDForPosition(args.Position));
 				
 			default:
 				UpdatePositionJS( args.Position, true); 			
  		end;
 	
-		AddToJSQueue(JS_PP_CALLBACK + ".update('"+ args.Reason.ToString() + "','" + IDForPosition(args.Position) + "');");
-		AddToJSQueue(JS_PP_CALLBACK + ".next();");
-		
-		ProcessJSQueue();	
+		web.Document.InvokeScript(JS_PP_CALLBACK + "Update", args.Reason.ToString(), IDForPosition(args.Position));
+		web.Document.InvokeScript(JS_PP_CALLBACK + "Next");
 	end;
 end;
 
@@ -423,35 +368,20 @@ end;
 method void UpdateOrdersJS(string reason)
 vars: int x, int y, Vector jsArr;
 begin 
-	AddToJSQueue(JS_OP_CALLBACK + ".clear();");  
+
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Clear");
 
 	For x = 0 to OrdersProvider1.Count - 1 
 	begin
 		UpdateOrderJS( OrdersProvider1.Order[x], false);
 	end;		 
-				
-	AddToJSQueue(JS_OP_CALLBACK + ".update('"+ reason + "','');");
+
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Update", reason, "");
 end;
 
 method void UpdateOrderJS(tsdata.trading.Order order, bool extendOnly)
-vars: int y, Vector jsArr;
 begin
-	// Reduce the max size by the additional information that could be passed as part of the string to navigate
-	jsArr = FlatDictionaryToVectorOfJSON(OrderToDictionary(order), MAX_URL_SIZE - (strlen(JS_OP_CALLBACK + ".extend('');" + order.OrderID) + MAX_JS_PREFIX + 2));
-
-	For y = 0 to jsArr.Count - 1 
-	begin
-				
-		if y = 0 and extendOnly = false then
-		begin
-			AddToJSQueue(JS_OP_CALLBACK + ".add('" + order.OrderID + "'," + jsArr[y].ToString() + ");");
-		end
-		else
-		begin
-			AddToJSQueue(JS_OP_CALLBACK + ".extend('" + order.OrderID + "'," + jsArr[y].ToString() + ");");
-		end;
-	end;
-
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Add", order.OrderID, DictionaryToJSON(OrderToDictionary(order)));
 end;
 
 method Dictionary OrderToDictionary(tsdata.trading.Order order)
@@ -544,16 +474,14 @@ begin
 				UpdateOrderJS( args.Order, false);
 				
 			case tsdata.trading.OrderUpdateReason.removed:
-				AddToJSQueue(JS_OP_CALLBACK + ".remove('" + args.OrderID + "');");
+				web.Document.InvokeScript(JS_OP_CALLBACK + "Remove", args.Order.OrderID);
 				
 			default:
 				UpdateOrderJS( args.Order, true); 			
  		end;
 	
-		AddToJSQueue(JS_OP_CALLBACK + ".update('"+ args.Reason.ToString() + "','" + args.OrderID + "');");
-		AddToJSQueue(JS_OP_CALLBACK + ".next();");
-		
-		ProcessJSQueue();	
+		web.Document.InvokeScript(JS_OP_CALLBACK + "Update", args.Reason.ToString(), args.OrderID);
+		web.Document.InvokeScript(JS_OP_CALLBACK + "Next");
 	end;
 end;
 
@@ -569,21 +497,13 @@ begin
 	
 	ot.Send();
 	
-	AddToJSQueue(JS_OT_CALLBACK + ".send();");
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Send");
 end;
 
 method void LoadOrderTicketJS(tsdata.trading.OrderTicket ot)
-vars: int y, Vector jsArr;
 begin
-	// Reduce the max size by the additional information that could be passed as part of the string to navigate
-	jsArr = FlatDictionaryToVectorOfJSON(OrderTicketToDictionary(ot), MAX_URL_SIZE - (strlen(JS_OT_CALLBACK + ".extend('');")  + MAX_JS_PREFIX + 2));
-
-	For y = 0 to jsArr.Count - 1 
-	begin				
-		AddToJSQueue(JS_OT_CALLBACK + ".extend(" + jsArr[y].ToString() + ");");
-	end;
-	
-	AddToJSQueue(JS_OT_CALLBACK + ".load();");
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Extend", DictionaryToJSON(OrderTicketToDictionary(ot)));
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Load");
 end;
 
 method tsdata.trading.ReplaceTicket DictionaryToReplaceTicket(Dictionary dict, tsdata.trading.ReplaceTicket rt)
@@ -697,23 +617,8 @@ end;
 // Update or Add a specific account using JS
 //--------------------------------------------------------------------------------
 method void UpdateAccountJS(tsdata.trading.Account account, bool extendOnly)
-vars: int y, Vector jsArr;
 begin
-	// Reduce the max size by the additional information that could be passed as part of the string to navigate
-	jsArr = FlatDictionaryToVectorOfJSON(AccountToDictionary(account), MAX_URL_SIZE - (strlen(JS_AP_CALLBACK + ".extend('');" + account.AccountID) + MAX_JS_PREFIX + 2));
-
-	For y = 0 to jsArr.Count - 1 
-	begin
-				
-		if y = 0 and extendOnly = false then
-		begin
-			AddToJSQueue(JS_AP_CALLBACK + ".add('" + account.AccountID + "'," + jsArr[y].ToString() + ");");
-		end
-		else
-		begin
-			AddToJSQueue(JS_AP_CALLBACK + ".extend('" + account.AccountID + "'," + jsArr[y].ToString() + ");");
-		end;
-	end;
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Add", account.AccountID, DictionaryToJSON(AccountToDictionary(account)));
 end;
 
 //--------------------------------------------------------------------------------
@@ -722,14 +627,14 @@ end;
 method void UpdateAccountsJS(string reason, string accountID)
 vars: int x, int y, Vector jsArr;
 begin 
-	AddToJSQueue(JS_AP_CALLBACK + ".clear();");  
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Clear");
 
 	For x = 0 to AccountsProvider1.Count - 1 
 	begin
 		UpdateAccountJS( AccountsProvider1.Account[x], false);
 	end;		 
-				
-	AddToJSQueue(JS_AP_CALLBACK + ".update('"+ reason + "','" + accountID + "');");
+
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Update", reason, accountID);		
 end;
 
 method Dictionary AccountToDictionary(tsdata.trading.Account acct)
@@ -776,9 +681,7 @@ end;
 method void AccountsProvider1_StateChanged( elsystem.Object sender, tsdata.common.StateChangedEventArgs args ) 
 var: Dictionary dict;
 begin
-	AddToJSQueue(JS_AP_CALLBACK + ".status('" + args.NewState.ToString() + "','" + args.OldState.ToString() + "');");	
-	
-	ProcessJSQueue();
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Status", args.NewState.ToString(), args.OldState.ToString());
 end;
 
 method void AccountsProvider1_Updated( elsystem.Object sender, tsdata.trading.AccountUpdatedEventArgs args ) 
@@ -790,9 +693,8 @@ begin
 			
 		UpdateAccountJS(args.Account, false);
 		
-		AddToJSQueue(JS_AP_CALLBACK + ".update('"+ args.Reason.ToString() + "','" + args.AccountID + "');");
-		AddToJSQueue(JS_PP_CALLBACK + ".next();");
-		ProcessJSQueue();
+		web.Document.InvokeScript(JS_AP_CALLBACK + "Update", args.Reason.ToString(), args.AccountID);
+		web.Document.InvokeScript(JS_AP_CALLBACK + "Next");
 	end;	
 end;
 
@@ -1236,190 +1138,3 @@ begin
 			
 	return resultValue;
 end;
-
-
-//#############################################################################
-// Javascript Execution Helpers
-//#############################################################################
-//--------------------------------------------------------------------------------
-// Breaks up a Dictionary into multiple JSON object strings in order to work
-// around the limitations of javascript calls using WebBrowser.Navigate
-//--------------------------------------------------------------------------------
-method Vector FlatDictionaryToVectorOfJSON( Dictionary dict, int maxSizePerVectorItem )   
-var: Vector arr, string jsonResult, string currentkey, string modifiedJSON, int x, bool skipComma, elSystem.Object item;
-begin
-	skipComma = true;
-	arr = Vector.Create();
-
-	jsonResult = "{"; 
-	
-	For x = 0 to dict.Keys.Count - 1 
-	begin
-		If skipComma = false then
-			jsonResult += ","; 
-			
-		item = dict.Items[dict.Keys[x].ToString()];
-			
-		if item istype String or item istype int or item istype double or item istype float then
-		begin
-		
-			if item istype string then
-				currentkey = doublequote + dict.Keys[x].ToString() + doublequote + ":" + doublequote + item.ToString() + doublequote
-			else
-				currentkey = doublequote + dict.Keys[x].ToString() + doublequote + ":" + item.ToString();
-			
-			modifiedJSON = jsonResult + currentkey;
-			
-			if strlen(modifiedJSON) > (maxSizePerVectorItem - 1) then
-			begin
-				arr.push_back(leftstr(jsonResult, strlen(jsonResult) - 1) + "}");
-				jsonResult = "{";
-				skipComma = true;
-			end;
-			
-			jsonResult += currentkey;
-		end;
-		
-		skipComma = false;
-	end;
-	
-	if strlen(jsonResult) > 1 then
-	begin
-		arr.push_back(jsonResult + "}");
-	end; 
-	
-	return arr;
-end;
-
-//--------------------------------------------------------------------------------
-// ProcessJSQuote will process all items in the javascript queue that
-// fit within the Navigate functions parameter. Microsoft states that a url can
-// only contain up to 2083 characters http://support.microsoft.com/kb/208427 and 
-// this method will properly trim the url and continue processing until the 
-// queue is empty. Please note that the character limit for WebBrower.Navigate 
-// is 508.
-//--------------------------------------------------------------------------------
-method void ProcessJSQueue()
-var: string jsText;
-begin
-	if jsIsProcessing = false then
-	begin
-		jsText = "javascript:";
-		
-		If (jsQueue.Count > 0) and (strlen(jsText + jsQueue.Peek() astype String) > MAX_URL_SIZE) then
-		begin
-			print("Your javascript function call is larger than MAX_URL_SIZE! Removing the call from the queue.");
-			jsQueue.Dequeue();
-		end;
-
-		While (jsQueue.Count > 0) and (strlen(jsText + jsQueue.Peek() astype String) < MAX_URL_SIZE) 
-		Begin
- 			jsText += jsQueue.Dequeue() astype String;
-		End;
-		
-		if strlen(jsText) > MAX_JS_PREFIX then 
-		begin
-			jsIsProcessing = true;
-			web.Navigate(jsText); 
-				
-			if displayDebugInfo then
-			begin
-				print("---------------- javascript call ----------------");
-				print(jsText);
-				print(jsQueue.Count.ToString() + " still in queue.");
-				print("Size of buffer: " + numtostr(strlen(jsText), 0));
-				print("-------------------------------------------------");
-
-			end;
-		end
-		else		
-		begin
-			if jsQueue.Count > 0 then
-			begin
-				print("------> STOP! Queue item too large!" + jsQueue.Count.ToString() + " " + strlen(jsQueue.Peek() astype string).ToString()); 
-			end;
-		end;
-	end
-	Else
-		if displayDebugInfo then
-			print("Processing javascript, please wait...");
-end;
-
-//--------------------------------------------------------------------------------
-// Add javascript to the queue and process. 
-//--------------------------------------------------------------------------------
-method void AddToJSQueue( string js )
-begin
-	jsQueue.Enqueue(js);
-end;  
-
-//--------------------------------------------------------------------------------
-// Clear the queue
-//--------------------------------------------------------------------------------
-method void ClearJSQueue()
-begin
-	jsQueue.Clear();
-	jsIsProcessing = false;
-	
-	if displayDebugInfo then
-		print("Clearing queue.");
-end; 
-
-//--------------------------------------------------------------------------------
-// Check if the url param is a javascript url
-//--------------------------------------------------------------------------------
-method bool IsJSUrl(string url)
-begin
-	return (instr(url, "javascript:") = 1); 
-end;
-
-//--------------------------------------------------------------------------------
-// Checks to see if there are any items in the queue that need to be sent to the
-// web browser.
-//--------------------------------------------------------------------------------
-method void EvaluateJSQueue(string url)
-begin
-	if IsJSUrl(url) then
-	begin
-		if jsIsProcessing = true and jsQueue.Count > 0 then
-			if displayDebugInfo then
-				print("processing items in queue...");
-		
-		jsIsProcessing = false; 
-		ProcessJSQueue();
-	end;
-end;
-
-// Method called on Timer1 Elapsed event.
-// The sender parameter identifies the object that fires the event.
-// The args parameter contains additional information about the event.
-// NOTE:  Do not modify the method name, return type, or input parameters.
-
-method void Timer1_Elapsed( elsystem.Object sender, elsystem.TimerElapsedEventArgs args ) 
-vars: Queue replaceQueue;
-begin
-	if jsQueue.Count > 0 then
-	begin
-		// Sometimes URL navigation causes the queue not to be fully worked, if this timer is
-		// hit, work the queue
-		print("Timer - check queue: " + jsQueue.Count.ToString());
-		
-		replaceQueue = Queue.Create();
-		
-		replaceQueue.Enqueue(prevJSQueueItem);
-		
-		while jsQueue.Count > 0 begin
- 			replaceQueue.Enqueue(jsQueue.Dequeue());
-		end;
-		
-		jsQueue = replaceQueue;
-		
-		jsIsProcessing = false;
-		ProcessJSQueue();
-	end
-	else
-		if displayDebugInfo then
-			print("Timer - empty queue: " + jsQueue.Count.ToString());	
-	
-end;
-

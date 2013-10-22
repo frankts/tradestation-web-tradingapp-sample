@@ -22,13 +22,13 @@ var TradingApp = {
 		// This timeout is added in order to work around a delay in receiving events in a TradingApp Web Brower window. (some events are missed)
 		setTimeout(function() {  
 			var _parent = TradingApp;
-
-			_parent.Positions.request();
+			
 			_parent._HashtagQueue.init();
 			_parent.Accounts.request();
+			_parent.Positions.request();			
 			_parent.Orders.request();			
 			_parent.Orders.Ticket.request();			
-		}, 1000);
+		}, 0);
 	},
 
 	Accounts: {
@@ -406,19 +406,103 @@ var TradingApp = {
 	}	
 };
 
-function taPPtest(a,b){
-	$("#eventsContent").append("Testing Invoke <br/>");
-}
+// InvokeScript delegates
 
-function taPPadd(positionID, positionItem) {
-	alert(positionID);
-	TradingApp.Positions.delegates().add(positionID, positionItem);
+//Accounts
+function TradingAppAccountsDelegateAdd(accountID, accountItem){
+	TradingApp.Accounts.delegates().add(accountID, JSON.parse(accountItem));
 };
 
-function taPPupdate(reason, positionItem) {
-	TradingApp.Positions.delegates().update(reason);
+function TradingAppAccountsDelegateExtend(accountID, accountItem){
+	TradingApp.Accounts.delegates().extend(accountID, JSON.parse(accountItem));
 };
 
+function TradingAppAccountsDelegateClear(){
+	TradingApp.Accounts.delegates().clear();
+};
+
+function TradingAppAccountsDelegateNext(){
+	TradingApp.Accounts.delegates().next();
+};
+
+function TradingAppAccountsDelegateUpdate(reason, accountID){
+	TradingApp.Accounts.delegates().update(reason, accountID);
+};
+
+function TradingAppAccountsDelegateStatus(oldState, oldState){
+	TradingApp.Accounts.delegates().status(oldState, oldState);
+};
+
+//Orders 
+function TradingAppOrdersDelegateAdd(orderID, orderItem){
+	TradingApp.Orders.delegates().add(orderID, JSON.parse(orderItem));
+};
+
+function TradingAppOrdersDelegateExtend(orderID, orderItem){
+	TradingApp.Orders.delegates().extend(orderID, JSON.parse(orderItem));
+};
+
+function TradingAppOrdersDelegateRemove(orderID){
+	TradingApp.Orders.delegates().remove(orderID);
+};
+
+function TradingAppOrdersDelegateClear(){
+	TradingApp.Orders.delegates().clear();
+};
+
+function TradingAppOrdersDelegateNext(){
+	TradingApp.Orders.delegates().next();
+};
+
+function TradingAppOrdersDelegateUpdate(reason, orderID){
+	TradingApp.Orders.delegates().update(reason, orderID);
+};
+
+function TradingAppOrdersDelegateState(newState, oldState){
+	TradingApp.Orders.delegates().status(oldState, oldState);
+};
+
+//Ticket
+function TradingAppOrdersTicketDelegateExtend(ticket){
+	TradingApp.Orders.Ticket.delegates().extend(JSON.parse(ticket));
+};
+
+function TradingAppOrdersTicketDelegateNext(){
+	TradingApp.Orders.Ticket.delegates().next();
+};
+
+function TradingAppOrdersTicketDelegateLoad(){
+	TradingApp.Orders.Ticket.delegates().load();
+};
+
+function TradingAppOrdersTicketDelegateSend(){
+	TradingApp.Orders.Ticket.delegates().send();
+};
+
+//Positions
+function TradingAppPositionsDelegateAdd(positionID, positionItem){
+	TradingApp.Positions.delegates().add(positionID, JSON.parse(positionItem));
+};
+
+function TradingAppPositionsDelegateExtend(positionID, positionItem){
+	TradingApp.Positions.delegates().extend(positionID, JSON.parse(positionItem));
+};
+
+function TradingAppPositionsDelegateRemove(positionID){
+	TradingApp.Positions.delegates().remove(positionID);
+};
+
+function TradingAppPositionsDelegateClear(){
+	TradingApp.Positions.delegates().clear();
+};
+
+function TradingAppPositionsDelegateNext(){
+	TradingApp.Positions.delegates().next();
+};
+
+function TradingAppPositionsDelegateUpdate(reason, positionID){
+	TradingApp.Positions.delegates().update(reason, positionID);
+};
 
 // The MIT License (MIT)
 
