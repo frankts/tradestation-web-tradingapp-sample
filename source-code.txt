@@ -77,7 +77,9 @@ begin
 		
 	progress.Minimum = 0;
 	progress.Maximum = progArgs.MaximumProgress;
-	progress.Value = progArgs.CurrentProgress;
+	
+	if progArgs.CurrentProgress >= 0 then
+		progress.Value = progArgs.CurrentProgress;
 	
 	If progress.Minimum = 0 and progress.Maximum = 0 then
 		progress.Visible = false
