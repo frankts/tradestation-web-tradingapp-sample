@@ -361,6 +361,53 @@ var TradingApp = {
 		}
 	},
 
+
+	SymbolList : {
+
+		request: function() {
+			// `request` requests, asynchronously, the current list of positions.
+			TradingApp._call( function() { window.location.href = TradingApp.SymbolList._hashes._items; } );
+		},
+
+		items: function() {
+			return this._items;
+		},
+
+		item: function(id){
+			// `item` provides a way to lookup position by a pseudo PositionID (account_symbol).
+			return _items[id];
+		},	
+
+		delegates: function() {
+			//  *`delegates` provide a callback mechanism for EasyLanguage. These methods are considered private and should not be called directly.*
+			var _parent = this;
+
+			return {
+
+				add: function(symbollistitems) {	
+
+					_parent._items = [];
+
+					_parent._items = _parent._items.concat(symbollistitems);
+
+					$(TradingApp.SymbolList).trigger("onAdd", [_parent._items]);
+				},
+
+				next: function()
+				{
+					TradingApp._next();
+				}				
+			}
+		},	
+
+		_items: [],
+
+		_hashes: {
+			_items: "#SL:AN=DISPLAY;",
+		}
+	},
+
+
 	_HashtagQueue: {
 		//  *`_HashtagQueue` is used to ensure that requests do not invalidate each other by only working one request at a time. This is temporary until we implement a native JavaScript callback to EasyLangauge.*
 		_queue: [],
@@ -502,6 +549,14 @@ function TradingAppPositionsDelegateNext(){
 
 function TradingAppPositionsDelegateUpdate(reason, positionID){
 	TradingApp.Positions.delegates().update(reason, positionID);
+};
+
+function TradingAppSymbolListDelegateAdd(symbollistitems){
+	TradingApp.SymbolList.delegates().add(JSON.parse(symbollistitems));
+};
+
+function TradingAppSymbolListDelegateNext(){
+	TradingApp.SymbolList.delegates().next();
 };
 
 // The MIT License (MIT)

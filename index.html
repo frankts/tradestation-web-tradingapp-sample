@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
   <title>Web TradingApp</title>
   <link href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
   <!--[if lte IE 7]>
@@ -58,6 +59,7 @@
           <li class="active"><a href="#accounts_tab">Accounts <i id="accounts_refresh" class="icon-refresh"></i></a></li>
           <li><a href="#orders_tab">Orders <i id="orders_refresh" class="icon-refresh"></i></a></li>
           <li><a href="#positions_tab">Positions <i id="positions_refresh" class="icon-refresh"></i></a></li>
+          <li><a href="#symbollist_tab">Symbollist</a></li>
         </ul>
 
         <div class="tab-content">
@@ -76,6 +78,11 @@
           <div class="tab-pane" id="positions_tab">
             <div id="positions_chart_div" style="width: 100%; height: 500px;"></div>
             <div class="accordion" id="ppAccord"></div>
+          </div>
+          <div class="tab-pane" id="symbollist_tab">
+            <button id="symbollist_request" type="button" class="btn btn-primary">Choose your list...</button>
+            <hr/>
+            <div class="" id="slList"></div>
           </div>
         </div>
       </div>
@@ -324,6 +331,28 @@
       positionsLoaded = true;
       drawPositions();
     });
+
+    $("#symbollist_request").click(function(ev) {
+      TradingApp.SymbolList.request();
+    });
+    
+    $(TradingApp.SymbolList).bind("onAdd", function(ev, symbollistitems) {
+      var symbolText = "";
+
+      symbolText += "<ul class='media-list'>"
+
+      for (var x = 0; x < symbollistitems.length; x++) {
+        symbolText += "<li class='media'>";
+        symbolText += symbollistitems[x];
+        symbolText += "</li>";
+      }
+
+      symbolText += "</ul>";
+
+      $('#slList').html(symbolText);
+
+    });
+
 
     $('#myTab a').click(function (e) {
       e.preventDefault();
