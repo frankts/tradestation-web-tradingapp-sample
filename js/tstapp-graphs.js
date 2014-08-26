@@ -21,14 +21,19 @@
 
     var data = google.visualization.arrayToDataTable(arrData);
 
-    var options = {
-      title: 'Accounts - Realized vs Unrealized - Purchasing Power',
-      hAxis: {title: 'Unrealized P/L'},
-      vAxis: {title: 'Realized P/L'},
-      bubble: {textStyle: {fontSize: 11}}
+    var options = {  
+      title: 'Realized vs Unrealized - Purchasing Power',
+      titleTextStyle: {color: chartTitleColor},
+      bubble: {textStyle: {fontSize: 11, color: chartTitleColor}},
+      vAxis: {title: 'Realized P/L',  titleTextStyle: {color: chartTitleColor}, textStyle: {color: chartHighlightColor}, gridlines: { color: chartTitleColor}},
+      xAxis: {title: 'Unrealized P/L', titleTextStyle: {color: chartTitleColor}, textStyle: {color: chartHighlightColor}, gridlines: { color: chartTitleColor}, baselineColor: chartTitleColor},
+      colors: [chartHighlightColor],
+      legend: 'none',
+      chartArea:{width:'80%',height:'90%'},
+      backgroundColor: 'transparent'      
     };
 
-    var chart = new google.visualization.BubbleChart(document.getElementById('accounts_chart_div'));
+    var chart = new google.visualization.BubbleChart(document.getElementById('accounts-chart'));
     chart.draw(data, options);
   };
 
@@ -36,7 +41,7 @@
     if(window.isOldIE != null || ordersLoaded == false)
       return;
 
-    var container = document.getElementById('orders_chart_div');
+    var container = document.getElementById('orders-chart');
     var chart = new google.visualization.Timeline(container);
     var dataTable = new google.visualization.DataTable();
 
@@ -86,25 +91,30 @@
 
     if (items.length > 0)
     {
-      var arrData = [['Symbol', 'Open P/L']];
+      var arrData = [['Symbol', 'Open P/L', {role: 'style'}]];
 
       for(var x = 0; x < items.length; x++)
       {
         var item = items[x];
 
         if(item['Symbol'] != null && item['OpenPL'] != null)
-          arrData.push([items[x].Symbol, items[x].OpenPL]);
+          arrData.push([items[x].Symbol, items[x].OpenPL, chartHighlightColor]);
       }      
 
       var data = google.visualization.arrayToDataTable(arrData);
 
       var options = {
-        title: 'Current positions',
-        vAxis: {title: 'Symbol',  titleTextStyle: {color: 'blue'}}
-
+        title: 'Profit and Loss',
+        titleTextStyle: {color: chartTitleColor},
+        vAxis: { gridlines: { color: chartTitleColor}, textStyle: {color: chartHighlightColor}},
+        xAxis: { textStyle: {color: chartHighlightColor}, baselineColor: chartTitleColor},
+        colors: [chartHighlightColor],
+        legend: 'none',
+        chartArea:{width:'80%',height:'90%'},
+        backgroundColor: 'transparent'
       };
 
-      var chart = new google.visualization.BarChart(document.getElementById('positions_chart_div'));
+      var chart = new google.visualization.BarChart(document.getElementById('positions-chart'));
       chart.draw(data, options);
     }
   };

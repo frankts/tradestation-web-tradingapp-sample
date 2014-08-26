@@ -59,7 +59,7 @@ var TradingApp = {
 
 		item: function(accountID) {	
 			// `item` provides a way to lookup accounts by AccountID.
-			return _items[accountID];
+			return this._items[accountID];
 		},
 
 		// *private members*
@@ -147,7 +147,7 @@ var TradingApp = {
 
 		item: function(orderID){
 			// `item` provides a way to lookup accounts by OrderID.
-			return _items[orderID];
+			return this._items[orderID];
 		},		
 
 		Ticket: {
@@ -295,7 +295,7 @@ var TradingApp = {
 
 		item: function(positionID){
 			// `item` provides a way to lookup position by a pseudo PositionID (account_symbol).
-			return _items[positionID];
+			return this._items[positionID];
 		},		
 
 		close: function(positionID){
@@ -428,7 +428,6 @@ var TradingApp = {
 				if(fn != null)
 				{
 					fn();
-					$("#eventsContent").append("process queue:" + this._queue.length.toString() + "<br/>");
 					this.isProcessing = true;
 				}				
 			}

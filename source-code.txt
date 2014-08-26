@@ -10,15 +10,18 @@ using elsystem.drawing;
 using elsystem.collections;
  
 vars:
-	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v1"),  
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v3/index.html"),
 	Form mainForm(null), 
+	Form mainForm2(null), 
 	WebBrowser web(null),
 	ProgressBar progress(null),
 	bool displayDebugInfo(false),
+	SymbolListDialog slDialog(null),
 	string JS_AP_CALLBACK("TradingAppAccountsDelegate"),
 	string JS_OT_CALLBACK("TradingAppOrdersTicketDelegate"),
 	string JS_OP_CALLBACK("TradingAppOrdersDelegate"),
-	string JS_PP_CALLBACK("TradingAppPositionsDelegate");
+	string JS_PP_CALLBACK("TradingAppPositionsDelegate"),
+	string JS_SL_CALLBACK("TradingAppSymbolListDelegate");
 	
 method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) 
 var: int x, Dictionary dict;
@@ -33,8 +36,11 @@ begin
 	progress.Maximum = 100;
 	progress.Value = 100;	
 
-	mainForm = Form.Create("TradingAppJSForm", 100, 100); 
+	mainForm = Form.Create("Leaderboard", 100, 100); 
 	mainForm.Dock = DockStyle.right;
+	
+	mainForm2 = Form.Create("Chart", 100, 100); 
+	mainForm2.Dock = DockStyle.right;
 	
 	mainForm.AddControl(progress);
 	mainForm.AddControl(web);	 
@@ -52,6 +58,7 @@ begin
 	web.Navigate(url);
 	
 	mainForm.Show();
+	mainForm2.Show();
 	
 	progress.Visible = false; 	
 	 
@@ -110,6 +117,7 @@ begin
 		   (instr( URL, "#OP:") > 0) or 
 		   (instr( URL, "#PP:") > 0) or 
 		   (instr( URL, "#AP:") > 0) or 
+		   (instr( URL, "#SL:") > 0) or 
 		   (instr( URL, "#FN:") > 0); 
 end;
 
@@ -152,9 +160,45 @@ begin
 			JSPositionsProvider(fields);
 			return true;
 		end;
+		
+		fields = ExtractFieldsFromURL(url, "#SL:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSSymbolList(fields);
+			return true;
+		end;		
 	end;
 	
 	return false;
+end;
+
+method void JSSymbolList(string fields)
+var: string field, Vector jsArr;
+begin
+	field = FindField(fields, "AN=", ";"); 
+				
+	if strlen(field) > 0 and upperstr(field) = "DISPLAY" then
+	begin
+		slDialog = SymbolListDialog.Create();
+		slDialog.StatusChanged += OnSymbolList_StatusChanged;
+		
+		slDialog.Show();
+	end;
+end;
+
+method void OnSymbolList_StatusChanged( elsystem.Object sender, DialogStatusChangedEventArgs args )
+vars: int x, Vector jsArr; 
+begin
+	jsArr = Vector.Create();
+	
+	For x = 0 to slDialog.Count - 1 
+	begin
+		jsArr.push_back(slDialog[x]);
+	end;	
+	
+	web.Document.InvokeScript(JS_SL_CALLBACK + "Add", VectorToJSArray(jsArr));
+	web.Document.InvokeScript(JS_SL_CALLBACK + "Next");
 end;
 
 method void JSAccountsProvider(string fields)
@@ -896,6 +940,8 @@ begin
 		else
 			jsResult += arr[x].ToString();
 	end;
+	
+	jsResult += "]";
 	
 	return jsResult;
 end;

@@ -3,330 +3,610 @@
 <head>
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
   <title>Web TradingApp</title>
-  <link href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
-  <!--[if lte IE 7]>
-  <script src="http://bestiejs.github.io/json3/lib/json3.js"></script>
-  <script>
-      var isOldIE = true; 
-  </script>
-  <![endif]-->  
+
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+  <link id="theme" rel="stylesheet" type="text/css" href="./css/dark/bootstrap.min.css">
+
   <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
   <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
-  <script type="text/javascript" src="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
-  <script type="text/javascript" src="./tstapp.js"></script>
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-  <script type="text/javascript" src="./tstapp-graphs.js"></script> 
+
+  <script type="text/javascript" src="./js/tstapp.js"></script>  
+  <script type="text/javascript" src="./js/tstapp-graphs.js"></script> 
   <style>
-    .icon-refresh {
-      cursor: pointer;
-    }
+
+  .dynamic-chart {
+    width: 100%;
+    height: 10px;
+  }
+
+  .ts-full-width {
+    width: 100%;
+  }
+
+  .ts-toolbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 48px;
+    height: 100%;
+  }
+
+  .ts-toolbar-btn {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .ts-toolbar-push {
+    margin-left: 48px;
+    margin-top: 10px;
+  }
+
   </style>
 </head>
-<body>
-  <div class="navbar navbar-static-top navbar-inverse">
-    <div class="navbar-inner">
-      <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
-      <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </a>
-      <a class="brand" href="#" style="margin-left: 4px;">Web TradingApp</a>
-      <div class="nav-collapse collapse">
-        <ul class="nav">
-          <li class="active"><a href="#">logged in as: <strong>You</strong></a></li>
-          <li><button type="button" data-toggle="modal" data-target="#myModal" class="btn btn-primary">Place Trade</button></li>
-          <li><button type="button" data-toggle="modal" data-target="#eventsModal" class="btn btn-inverse">Events</button></li>
-          <li><a href="./docs/tstapp.html" target="_blank">Documentation</a></li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="container-fluid">
-    <br/>
-    <div class="row-fluid">
-      <div class="span5">
-        <div class="hero-unit">
-          <h2>Web TradingApp</h2>
-          <hr/>
-          <p>This sample illustrates the ability to add a responsive web page to a TradeStation TradingApp. It is also possible to communicate via hash tags and parameters in a URL. Click on <button style="margin-left: 6px; margin-right: 6px;" type="button" data-toggle="modal" data-target="#myModal" class="btn btn-primary">Place Trade</button> to place a trade in the platform.</p> 
-          <hr/>
-          <p>If you are using TradeStation 9.1 Update 24 (or later), this browser supports from IE 7 up to IE 10 (based on the browser installed on the user's system).</p>
-        </div>      
-      </div>
-      <div class="span7">
-        <ul class="nav nav-tabs" id="myTab">
-          <li class="active"><a href="#accounts_tab">Accounts <i id="accounts_refresh" class="icon-refresh"></i></a></li>
-          <li><a href="#orders_tab">Orders <i id="orders_refresh" class="icon-refresh"></i></a></li>
-          <li><a href="#positions_tab">Positions <i id="positions_refresh" class="icon-refresh"></i></a></li>
-          <li><a href="#symbollist_tab">Symbollist</a></li>
-        </ul>
+<body oncontextmenu="return false;">
 
+  <div class="ts-toolbar panel">
+    <ul class="nav nav-pills nav-stacked" role="tablist" id="tabbed-views">
+      <li class="active"><a title="Positions" href="#positions_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-map-marker"></span></a></li>  
+      <li><a title="Orders" href="#orders_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-flash"></span></a></li>
+      <li><a title="Accounts" href="#accounts_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-usd"></span></a></li>
+      <li><a title="SymbolList" href="#symbollist_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-list"></span></a></li>
+    </ul> 
+    <hr/>
+    <a title="Place a trade" type="button" class="btn btn-primary ts-full-width ts-toolbar-btn" data-toggle="modal" data-target="#place-trade-modal"><span class="glyphicon glyphicon-plus-sign"></span></a>
+    <a title="Display an alert" type="button" class="btn btn-warning ts-full-width ts-toolbar-btn" id="alert-btn"><span class="glyphicon glyphicon-exclamation-sign"></span></a>
+    <a title="Settings" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" data-toggle="modal" data-target="#settings-modal"><span class="glyphicon glyphicon-cog"></span></a>
+    <a title="Refresh" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="refresh-btn"><span class="glyphicon glyphicon-refresh"></span></a>
+    <a title="Toggle full window view" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="full-size-btn"><span class="glyphicon glyphicon-fullscreen"></span></a>
+    <a title="Toggle Light/Dark theme" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="theme-btn"><span class="glyphicon glyphicon-adjust"></span></a>
+    <a title="Help - About" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="help-btn"><span class="glyphicon glyphicon-question-sign"></span></a>
+  </div>
+
+  <div class="container-fluid ts-toolbar-push">
+    <div id="alert-box" class="alert alert-warning alert-dismissible" role="alert">
+      <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+      <h4><span class="glyphicon glyphicon-exclamation-sign"></span> Display notifications here.</h4> 
+      <p>Use the top of the window for notifications and confirmations.</p>
+      <br/>
+      <button type="button" class="btn btn-primary" data-dismiss="alert">Dismiss</button>
+      <button type="button" class="btn btn-info" data-dismiss="alert">Yes</button>
+      <button type="button" class="btn btn-default" data-dismiss="alert">No</button>
+      <button type="button" class="btn btn-success" data-dismiss="alert">OK</button>
+      <button type="button" class="btn btn-danger" data-dismiss="alert">Cancel</button>
+    </div>
+    <div class="row">
+      <div class="col-md-12">
         <div class="tab-content">
-          <div class="tab-pane active" id="accounts_tab">      
-            <div id="accounts_chart_div" style="width: 100%; height: 400px;"></div>
-            <div class="accordion" id="accountAccord"></div>
+          <div class="tab-pane" id="accounts_tab">      
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div id="accounts-chart" class="dynamic-chart"></div>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Actions</div>
+                  <div class="panel-body">
+                    <button type="button" class="btn btn-primary ts-full-width" data-toggle="modal" data-target="#place-trade-modal">Place Trade</button>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Accounts</div>
+                  <div class="panel-body">
+                    <div id="account-list">No accounts available.</div>
+                  </div>
+                </div>   
+
+              </div>
+            </div>
           </div>
           <div class="tab-pane" id="orders_tab">
-            <div id="orders_chart_div" style="width: 100%; height: 220px;"></div>
-            <div class="accordion" id="opAccord"></div> 
-            <div class="well well-small">
-              <h3 id="quote">Order Ticket</h3>
-              <div class="accordion" id="otAccord"></div>
-            </div>            
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div id="orders-chart" class="" style="width: 100%; height: 220px;"></div>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Actions</div>
+                  <div class="panel-body">
+                    <button type="button" class="btn btn-primary ts-full-width" data-toggle="modal" data-target="#place-trade-modal">Place Trade</button>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Orders</div>
+                  <div class="panel-body">
+                    <div id="orderList">No orders placed today.</div>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Order Ticket</div>
+                  <div class="panel-body">
+                    <div id="orderTicket"></div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
           </div>
-          <div class="tab-pane" id="positions_tab">
-            <div id="positions_chart_div" style="width: 100%; height: 500px;"></div>
-            <div class="accordion" id="ppAccord"></div>
+          <div class="tab-pane active" id="positions_tab">
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div id="positions-chart" class="dynamic-chart"></div>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Actions</div>
+                  <div class="panel-body">
+                    <button type="button" class="btn btn-primary ts-full-width" data-toggle="modal" data-target="#place-trade-modal">Place Trade</button>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Open positions</div>
+                  <div class="panel-body">
+                    <div class="accordion" id="ppAccord"></div>
+                    <div id="positionList">No positions available.</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
           </div>
           <div class="tab-pane" id="symbollist_tab">
-            <button id="symbollist_request" type="button" class="btn btn-primary">Choose your list...</button>
-            <hr/>
-            <div class="" id="slList"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal hide fade" id="myModal">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-        <h3>Place a trade</h3>
-      </div>
-      <div class="modal-body">
-        <form accept-charset="UTF-8" action="/sample/order_send" class="form-inline" id="dynamic_form" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="wie8bQl983TqVADB2eWIx6J91TnmvlNJmlNSeHRak/8=" /></div>
-          <div class='row-fluid'>
-            <div class='span12'>
-              <form>
-                <input id="formSymbol" name="Symbol" placeholder="e.g. AAPL,MSFT,etc." type="text" value="" style="width: 510px" />
-                <input id="formQuantity" name="Quantity" placeholder="" type="text" value="100" style="width: 510px" />
-                <select id="formDuration" style="width: 510px">                  
-                  <option value="DAY">DAY</option>
-                  <option value="DAY+">DAY+</option>
-                  <option value="GTC">GTC</option>
-                  <option value="GTC+">GTC+</option>
-                  <option value="GTD">GTD</option>
-                  <option value="GTD+">GTD+</option>
-                  <option value="FOK">FOK</option>
-                  <option value="IOC">IOC</option>
-                  <option value="OPG">OPG</option>
-                  <option value="1 Min">1 Min</option>
-                  <option value="3 Min">3 Min</option>
-                  <option value="5 Min">5 Min</option>
-                </select>
-                <select id="formType" style="width: 510px">
-                  <option value="market">market</option>
-                  <option value="limit">limit</option>
-                  <option value="stoplimit">stoplimit</option>
-                  <option value="stopmarket">stopmarket</option>
-                </select>
-                <select id="formAccount" style="width: 510px">
-                  <option value="unknown">No accounts specified</option>
-                </select>     
-                <select id="formAction" style="width: 510px">
-                  <option value="buy">buy</option>
-                  <option value="sell">sell</option>
-                  <option value="sellshort">sellshort</option>
-                  <option value="buytocover">buytocover</option>
-                </select>
-              </form>
-            </div>  
-          </div>
-        </form>  </div>
-        <div class="modal-footer">
-          <a id="send_order" href="#OT" class="btn btn-primary">Send order</a>
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div class="" id="slList">No symbols selected.</div>
+                <br/>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                  <div class="panel panel-default">
+                    <div class="panel-heading">Actions</div>
+                    <div class="panel-body">
+                      <button id="symbollist_request" type="button" class="btn btn-primary ts-full-width">Choose a list</button>
+                    </div>
+                  </div>
+
+                  <div class="panel panel-default">
+                    <div class="panel-heading">Instructions</div>
+                    <div class="panel-body">
+                      <p>Click the "Choose a list" button to bring up the symbollist dialog. Select a list and click "OK".</p>
+                    </div>
+                  </div>
+
+              </div>             
+            </div>
         </div>
       </div>
     </div>
 
-    <div class="modal hide fade" id="eventsModal">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-        <h3>Events</h3>
-      </div>
-      <div class="modal-body" id="eventsContent">
-      </div>
-      <div class="modal-footer">
+    <div class="modal fade" id="place-trade-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+              <h3><span class="glyphicon glyphicon-plus-sign"></span> Place a trade</h3>
+            </div>
+            <div class="modal-body">
+              <form class="form">
+                <div class="form-group">
+                  <input id="form-symbol" class="form-control" name="Symbol" placeholder="e.g. AAPL,MSFT,etc." type="text" value="" />
+                </div>
+                <div class="form-group">
+                  <input id="form-quantity" class="form-control" name="Quantity" placeholder="" type="text" value="100" />
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-duration">                  
+                    <option value="DAY">DAY</option>
+                    <option value="DAY+">DAY+</option>
+                    <option value="GTC">GTC</option>
+                    <option value="GTC+">GTC+</option>
+                    <option value="GTD">GTD</option>
+                    <option value="GTD+">GTD+</option>
+                    <option value="FOK">FOK</option>
+                    <option value="IOC">IOC</option>
+                    <option value="OPG">OPG</option>
+                    <option value="1 Min">1 Min</option>
+                    <option value="3 Min">3 Min</option>
+                    <option value="5 Min">5 Min</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-type">
+                    <option value="market">market</option>
+                    <option value="limit">limit</option>
+                    <option value="stoplimit">stoplimit</option>
+                    <option value="stopmarket">stopmarket</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-account">
+                    <option value="unknown">No accounts specified</option>
+                  </select>     
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-action">
+                    <option value="buy">buy</option>
+                    <option value="sell">sell</option>
+                    <option value="sellshort">sellshort</option>
+                    <option value="buytocover">buytocover</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <a id="send-order" href="#OT" class="btn btn-primary">Send order</a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
+    <div class="modal fade" id="details-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">      
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3>Details</h3>
+          </div>
+          <div class="modal-body" id="details-content">
+          </div>
+          <div class="modal-footer">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="settings-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">      
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3><span class="glyphicon glyphicon-cog"></span> Settings</h3>
+          </div>
+          <div class="modal-body">
+            Display the settings of your application here.
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" data-dismiss="modal" class="btn btn-primary">Apply</button>
+            <button class="btn btn-default" data-dismiss="modal" class="btn btn-primary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>    
+
+    <div class="modal fade" id="help-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">      
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3><span class="glyphicon glyphicon-question-sign"></span> Sample Web TradingApp</h3>
+          </div>
+          <div class="modal-body">
+            <p>This TradingApp is an example of how to create a TradeStation TradingApp that leverages HTML for its user experience. The code includes a sample javascript library which provides objects that make it easy to request information regarding Accounts, Orders, and Positions.</p>
+            <br/>
+            <p>Please visit <a target="_blank" href="http://developer.tradestation.com">http://developer.tradestation.com</a> for more information.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-default" data-dismiss="modal" class="btn btn-primary">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>       
 
 <script type="text/javascript">
+
+var chartHighlightColor = "#ffffff";
+var chartTitleColor     = "#ffffff";
+var darkTheme           = "./css/dark/bootstrap.min.css";
+var lightTheme          = "./css/light/bootstrap.min.css";
+
+function UpdateChartHeight()
+{
+  $('.dynamic-chart').css('height', (window.innerHeight.toString() - 20) + 'px'); 
+};
+
+function UpdateChartColors()
+{
+    chartHighlightColor = $('.btn-primary').css("background-color");
+    chartTitleColor     = $('.panel-heading').css("color");
+};
+
+function RedrawCharts()
+{
+  drawAccounts();
+  drawOrders();
+  drawPositions();
+};
 
   $(document).ready(function(){
 
     TradingApp.init();
 
-    $(window).on('hashchange', function() {
-      $("#eventsContent").append("Hash changed:" + window.location.href + "<br/>");
+    $('#help-modal').modal("show");
+
+    UpdateChartHeight();
+    UpdateChartColors();
+
+    $('#theme-btn').click(function(ev) {
+
+      if($('#theme-btn').hasClass('active'))
+      {
+        $("link[id=theme]").attr({href : darkTheme});
+        $('#theme-btn').removeClass('active');
+      }
+      else
+      {
+        $("link[id=theme]").attr({href : lightTheme});
+        $('#theme-btn').addClass('active');
+      }
+
+      setTimeout(UpdateChartColors, 0);
+      setTimeout(RedrawCharts, 0);
+
     });
 
-    $('#send_order').click(function(ev){
+    $('#help-btn').click(function(ev) {
+      $('#help-modal').modal("show"); 
+     });
+
+    $('#alert-btn').click(function(ev) {
+      $('#alert-box').is(":visible") == true ? $('#alert-box').hide() : $('#alert-box').show();
+    });
+
+    $('#alert-box').on('close.bs.alert', function () {
+      $('#alert-box').hide();
+      return false;
+    });
+
+    $('#full-size-btn').click(function(ev){
+
+      if($('#full-size-btn').hasClass('active'))
+      {
+        $('.expand-when-full-size').removeClass("col-md-12");
+        $('.expand-when-full-size').addClass("col-md-9");
+
+        $('.hide-when-full-size').show();
+
+
+        $('#full-size-btn').removeClass('active');
+      }
+      else
+      {
+
+        $('.expand-when-full-size').removeClass("col-md-9");
+        $('.expand-when-full-size').addClass("col-md-12");
+
+        $('.hide-when-full-size').hide();
+
+        $('#full-size-btn').addClass('active');
+      }
+
+      drawAccounts();
+      drawOrders();
+      drawPositions();
+
+      return false;
+    });
+
+    $('#refresh-btn').click(function(ev){
+      window.location = window.location.href.substr(0, window.location.href.indexOf('#'))
+    });
+
+    $('#send-order').click(function(ev){
 
       var ticket = TradingApp.Orders.Ticket.ticket;
 
-      ticket.Symbol = $('#formSymbol').val();
-      ticket.Duration = $('#formDuration option:selected').val();
-      ticket.Type = $('#formType option:selected').val();
-      ticket.Account = $('#formAccount option:selected').val();
-      ticket.Quantity = parseInt($('#formQuantity').val());
-      ticket.Action = $('#formAction option:selected').val();
+      ticket.Symbol = $('#form-symbol').val();
+      ticket.Duration = $('#form-duration option:selected').val();
+      ticket.Type = $('#form-type option:selected').val();
+      ticket.Account = $('#form-account option:selected').val();
+      ticket.Quantity = parseInt($('#form-quantity').val());
+      ticket.Action = $('#form-action option:selected').val();
 
       TradingApp.Orders.Ticket.send(ticket);
 
-      $('#myModal').modal('hide');
+      $('#place-trade-modal').modal('hide');
 
       return false;
 
     });
 
-    $("#accounts_refresh").click(function(ev) {
-      TradingApp.Accounts.request();
-    });
-
     $(TradingApp.Accounts).bind("onUpdate", function(ev, reason, accountID) {
 
       var items = TradingApp.Accounts.items();
-      var accordian = "";
+      var listHTML = "";
 
-      $("#eventsContent").append("Accounts update:" + JSON.stringify(items) + "<br/>");
-      $('#accountAccord').html("");
-      $('#formAccount').html("");
+      $('#account-list').html("");
+      $('#form-account').html("");
+
+      listHTML += "<div class='btn-group-vertical ts-full-width'>";
 
       for (var x = 0; x < items.length; x++) {
 
-        $('#formAccount').append('<option value="'+ items[x].AccountID + '">'+ items[x].AccountID + ' (' + items[x].Type + ')</option>');
+        listHTML += "<button class='account-details btn btn-primary'>"+items[x].AccountID+"</button>";
+        $('#form-account').append('<option value="'+ items[x].AccountID + '">'+ items[x].AccountID + ' (' + items[x].Type + ')</option>');
+      }
 
-        accordian = '<div class="accordion-group"><div class="accordion-heading"><a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#acct_' + items[x].AccountID + '">' + items[x].AccountID + '</a></div><div id="acct_' + items[x].AccountID  + '" class="accordion-body collapse"><div class="accordion-inner">';
+      listHTML += "</div>"; 
 
-        accordian += '<table class="table"><tr><th>Property</th><th>Value</th>';
+      $('#account-list').append(listHTML);
 
-        for( var property in items[x])
-        {
-          accordian += '<tr><td>' + property + '</td>';
-          accordian += '<td>' + items[x][property] + '</td></tr>';
+
+      $(".account-details").unbind("click").click(function(ev) {
+
+        var item = TradingApp.Accounts.item($(this).text());
+        var listContent = "";
+
+        $("#details-content").html("");
+
+        listContent += "<table class='table'>";
+
+        for( var property in item)
+        {           
+          listContent += '<tr><td>' + property + '</td>';
+          listContent += '<td>' + item[property] + '</td></tr>';
         }
 
-        accordian += '</table>';
+        listContent += "</table>";
 
-        accordian += '</div></div></div>';
-
-        $('#accountAccord').append(accordian);
-      } 
+        $("#details-content").html(listContent);
+        $('#details-modal').modal('show');
+      });     
 
       accountsLoaded = true;
       drawAccounts();
     });
 
-    $(TradingApp.Accounts).bind("onStatus", function(ev, newState, oldState) {
-
-      $("#eventsContent").append("Accounts status<br/>");
-
-      for (var x = 0; x < items.length; x++) {
-        $("#message").html("Accounts Status: " + "NewState: " + newState + " OldState: " + oldState);
-        $(".account_info").show();
-      } 
-    }); 
 
     $(TradingApp.Orders.Ticket).bind("onLoad", function(ev, ticket) {
-      var accordian = "";
+     $('#orderTicket').html("<button class='order-ticket-details btn btn-primary ts-full-width'>Details</button>");
 
-      $("#eventsContent").append("Order ticket: " + JSON.stringify(ticket));      
-      $('#otAccord').html("");
+     $(".order-ticket-details").unbind("click").click(function(ev) {
 
-      accordian = '<div class="accordion-group"><div class="accordion-heading"><a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#order_ticket_content">Ticket</a></div><div id="order_ticket_content" class="accordion-body collapse"><div class="accordion-inner">';
+      var item = TradingApp.Orders.Ticket.ticket;
+      var listContent = "";
 
-      accordian += '<table class="table"><tr><th>Property</th><th>Value</th>';
+      $("#details-content").html("");
 
-      for( var property in ticket)
-      {
-        accordian += '<tr><td>' + property + '</td>';
-        accordian += '<td>' + ticket[property] + '</td></tr>';
+      listContent += "<table class='table'>";
+
+      for( var property in item)
+      {           
+        listContent += '<tr><td>' + property + '</td>';
+        listContent += '<td>' + item[property] + '</td></tr>';
       }
 
-      accordian += '</table>';
+      listContent += "</table>";
 
-      accordian += '</div></div></div>';
+      $("#details-content").html(listContent);
+      $('#details-modal').modal('show');
+    }); 
 
-      $('#otAccord').append(accordian);
-    });
-
-    $("#orders_refresh").click(function(ev) {
-      TradingApp.Orders.request();
     });
 
     $(TradingApp.Orders).bind("onUpdate", function(ev, reason, orderID) {
 
       var items = TradingApp.Orders.items();
-      var accordian = "";
+      var listHTML = "";
 
-      $("#eventsContent").append("Orders update:" + JSON.stringify(items) + "<br/>");
-      $('#opAccord').html("");
+      $('#orderList').html("");
+
+      listHTML += "<div class='btn-group-vertical ts-full-width'>";
 
       for (var x = 0; x < items.length; x++) {
 
-        accordian = '<div class="accordion-group"><div class="accordion-heading"><a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#op_' + items[x].OrderID + '">' + items[x].OrderID + '_' + items[x].Symbol + '</a> </div><div id="op_' + items[x].OrderID + '" class="accordion-body collapse"><div class="accordion-inner">';
+        listHTML += "<button class='order-details btn ";
 
-        accordian += '<table class="table"><tr><th>Property</th><th>Value</th>';
+            // Change the color of the button if is has not been filled.
+            if(items[x].FilledQuantity != items[x].EnteredQuantity && items[x].State == "queued")
+              listHTML += "btn-warning";
+            else
+              listHTML += "btn-primary";
 
-        if(items[x].FilledQuantity != items[x].EnteredQuantity && items[x].State == "queued")
-          accordian += '<tr><td>Cancel</td><td><button class="cancel_order" data-orderid="' + items[x].OrderID + '" >Cancel</button></td></tr>';
+            listHTML += "' data-orderid='"+ items[x].OrderID + "'>"+ items[x].Symbol +" - "+ items[x].OrderID +"</button>";
+          }
 
-        for( var property in items[x])
-        {
-          accordian += '<tr><td>' + property + '</td>';
-          accordian += '<td>' + items[x][property] + '</td></tr>';
-        }          
+          listHTML += "</div>"; 
 
-        accordian += '</table>';
+          $('#orderList').append(listHTML);
 
-        accordian += '</div></div></div>';
+          $(".order-details").unbind("click").click(function(ev) {
 
-        $('#opAccord').append(accordian);
-      } 
+            var item = TradingApp.Orders.item($(this).data('orderid'));
+            var listContent = "";
 
-      $('.cancel_order').unbind("click").click(function(ev){
-        TradingApp.Orders.cancel($(this).data("orderid"));
-      });
+            $("#details-content").html("");
 
-      ordersLoaded = true;
-      drawOrders();
-    });  
+            listContent += "<table class='table'>";
 
-    $("#positions_refresh").click(function(ev) {
-      TradingApp.Positions.request();
-    });
+            if(item.FilledQuantity != item.EnteredQuantity && item.State == "queued")
+              listContent += '<tr><td>Cancel</td><td><button class="cancel_order btn btn-danger" data-orderid="' + item.OrderID + '" >Cancel</button></td></tr>';
+
+
+            for( var property in item)
+            {           
+              listContent += '<tr><td>' + property + '</td>';
+              listContent += '<td>' + item[property] + '</td></tr>';
+            }
+
+            listContent += "</table>";
+
+            $("#details-content").html(listContent);
+            $('#details-modal').modal('show');
+
+            $('.cancel_order').unbind("click").click(function(ev){
+              TradingApp.Orders.cancel($(this).data("orderid"));
+              $('#details-modal').modal('hide');
+            });
+
+          }); 
+
+          ordersLoaded = true;
+          drawOrders();
+        });  
 
     $(TradingApp.Positions).bind("onUpdate", function(ev, reason, positionID) {
 
-      var items = TradingApp.Positions.items();
-      var accordian = "";
 
-      $("#eventsContent").append("Positions update:" + JSON.stringify(items) + "<br/>");
-      $('#ppAccord').html("");
+      var items = TradingApp.Positions.items();
+      var listHTML = "";
+
+      $('#positionList').html("");
+
+      listHTML += "<div class='btn-group-vertical ts-full-width'>";
 
       for (var x = 0; x < items.length; x++) {
 
-        accordian = '<div class="accordion-group"><div class="accordion-heading"><a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#pp_' + items[x].PositionID + '">' + items[x].PositionID + '</a> </div><div id="pp_' + items[x].PositionID + '" class="accordion-body collapse"><div class="accordion-inner">';
+        listHTML += "<button class='position-details btn btn-primary'>"+ items[x].PositionID +"</button>";
+      }
 
-        accordian += '<table class="table"><tr><th>Property</th><th>Value</th>';
+      listHTML += "</div>"; 
 
-        accordian += '<tr><td>Close</td><td><button class="close_position" data-positionid="' + items[x].PositionID + '" >Close</button></td></tr>';
+      $('#positionList').append(listHTML);
 
-        for( var property in items[x])
-        {
-          accordian += '<tr><td>' + property + '</td>';
-          accordian += '<td>' + items[x][property] + '</td></tr>';
-        }          
+      $(".position-details").unbind("click").click(function(ev) {
 
-        accordian += '</table>';
+        var item = TradingApp.Positions.item($(this).text());
+        var listContent = "";
 
-        accordian += '</div></div></div>';
+        $("#details-content").html("");
 
-        $('#ppAccord').append(accordian);
-      } 
+        listContent += "<table class='table'>";
 
-      $('.close_position').unbind("click").click(function(ev){
-        TradingApp.Positions.close($(this).data("positionid"));
-      });
+        listContent += '<tr><td>Close</td><td><button class="close_position btn btn-danger" data-positionid="' + item.PositionID + '" >Close</button></td></tr>';
+
+        for( var property in item)
+        {           
+          listContent += '<tr><td>' + property + '</td>';
+          listContent += '<td>' + item[property] + '</td></tr>';
+        }
+
+        listContent += "</table>";
+
+        $("#details-content").html(listContent);
+        $('#details-modal').modal('show');
+
+        $('.close_position').unbind("click").click(function(ev){
+          TradingApp.Positions.close($(this).data("positionid"));
+          $('#details-modal').modal('hide');
+        });
+
+      }); 
+
 
       positionsLoaded = true;
       drawPositions();
@@ -335,7 +615,7 @@
     $("#symbollist_request").click(function(ev) {
       TradingApp.SymbolList.request();
     });
-    
+
     $(TradingApp.SymbolList).bind("onAdd", function(ev, symbollistitems) {
       var symbolText = "";
 
@@ -353,8 +633,14 @@
 
     });
 
+    window.onresize = function() {
+      UpdateChartHeight();
+      drawAccounts();
+      drawOrders();
+      drawPositions();     
+    };
 
-    $('#myTab a').click(function (e) {
+    $('#tabbed-views a').click(function (e) {
       e.preventDefault();
       $(this).tab('show');
 
@@ -363,19 +649,14 @@
       drawPositions();
     });
 
-      // remove the divs if IE7
-      if(window.isOldIE != null)
-      {
-        $('#accounts_chart_div').hide();  
-        $('#orders_chart_div').hide();
-        $('#positions_chart_div').hide();
-      }
-
-    });
-
-function mytest(a,b){
-  $("#eventsContent").append("Testing Invoke <br/>");
-}
+    // remove the divs if IE7
+    if(window.isOldIE != null)
+    {
+      $('#accounts-chart').hide();  
+      $('#orders-chart').hide();
+      $('#positions-chart').hide();
+    }
+  });
 
 </script>
 
