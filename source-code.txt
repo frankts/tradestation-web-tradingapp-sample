@@ -10,9 +10,8 @@ using elsystem.drawing;
 using elsystem.collections;
  
 vars:
-	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v3/index.html"),
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v3/index.html"),  	
 	Form mainForm(null), 
-	Form mainForm2(null), 
 	WebBrowser web(null),
 	ProgressBar progress(null),
 	bool displayDebugInfo(false),
@@ -36,11 +35,8 @@ begin
 	progress.Maximum = 100;
 	progress.Value = 100;	
 
-	mainForm = Form.Create("Leaderboard", 100, 100); 
+	mainForm = Form.Create("TradingAppJSForm", 100, 100); 
 	mainForm.Dock = DockStyle.right;
-	
-	mainForm2 = Form.Create("Chart", 100, 100); 
-	mainForm2.Dock = DockStyle.right;
 	
 	mainForm.AddControl(progress);
 	mainForm.AddControl(web);	 
@@ -58,7 +54,6 @@ begin
 	web.Navigate(url);
 	
 	mainForm.Show();
-	mainForm2.Show();
 	
 	progress.Visible = false; 	
 	 
