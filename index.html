@@ -59,6 +59,7 @@
     <hr/>
     <a title="Place a trade" type="button" class="btn btn-primary ts-full-width ts-toolbar-btn" data-toggle="modal" data-target="#place-trade-modal"><span class="glyphicon glyphicon-plus-sign"></span></a>
     <a title="Display an alert" type="button" class="btn btn-warning ts-full-width ts-toolbar-btn" id="alert-btn"><span class="glyphicon glyphicon-exclamation-sign"></span></a>
+    <a title="Current symbol" type="button" class="btn btn-info ts-full-width ts-toolbar-btn" id="symbollink-btn"><span class="glyphicon glyphicon glyphicon-font"></span></a>
     <a title="Settings" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" data-toggle="modal" data-target="#settings-modal"><span class="glyphicon glyphicon-cog"></span></a>
     <a title="Refresh" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="refresh-btn"><span class="glyphicon glyphicon-refresh"></span></a>
     <a title="Toggle full window view" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="full-size-btn"><span class="glyphicon glyphicon-fullscreen"></span></a>
@@ -67,6 +68,15 @@
   </div>
 
   <div class="container-fluid ts-toolbar-push">
+    <div id="symbollink-box" class="alert alert-info" role="alert">
+        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <h4> Symbol Changed - Current Symbol = <span style="font-weight: bold" id="symbollink-symbol">...</span></h4> 
+        <p>This is usually happens when you first open this window or by creating a SymbolLinking association in the TradeStation Platform.</p>
+    </div>
+    <div id="symbollink-broadcast-box" class="alert alert-success" role="alert">
+        <h4>Broadcasting Symbol - <span id="symbollink-broadcast-symbol">...</span></h4> 
+        <p>If other platform windows are linked, they will receive this symbol broadcast.</p>
+    </div>
     <div id="alert-box" class="alert alert-warning alert-dismissible" role="alert">
       <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
       <h4><span class="glyphicon glyphicon-exclamation-sign"></span> Display notifications here.</h4> 
@@ -184,6 +194,7 @@
                     <div class="panel-heading">Instructions</div>
                     <div class="panel-body">
                       <p>Click the "Choose a list" button to bring up the symbollist dialog. Select a list and click "OK".</p>
+                      <p>You can also test the SymbolLinking functionality by linking this window to another platform window, like Chart Analysis, and clicking on each symbol displayed once you have selected a list.</p>
                     </div>
                   </div>
 
@@ -309,10 +320,12 @@
 
 <script type="text/javascript">
 
-var chartHighlightColor = "#ffffff";
-var chartTitleColor     = "#ffffff";
-var darkTheme           = "./css/dark/bootstrap.min.css";
-var lightTheme          = "./css/light/bootstrap.min.css";
+var chartHighlightColor  = "#ffffff";
+var chartTitleColor      = "#ffffff";
+var darkTheme            = "./css/dark/bootstrap.min.css";
+var lightTheme           = "./css/light/bootstrap.min.css";
+var symbolLinkBoxTimeout = null;
+var lastBroadcastSymbol  = "";
 
 function UpdateChartHeight()
 {
@@ -323,6 +336,22 @@ function UpdateChartColors()
 {
     chartHighlightColor = $('.btn-primary').css("background-color");
     chartTitleColor     = $('.panel-heading').css("color");
+};
+
+function BroadcastSymbol(symbol) {
+  var _parent = this;
+  var timeout = null;
+
+  // Use the symbols in the symbol list to generate symbol link broadcasts
+  TradingApp.SymbolLink.broadcast(symbol);
+  $('#symbollink-broadcast-symbol').html(symbol);
+  $('#symbollink-broadcast-box').show();
+  
+  clearTimeout(symbolLinkBoxTimeout);
+  symbolLinkBoxTimeout = setTimeout(function(){$('#symbollink-broadcast-box').hide();}, 3000);
+
+  lastBroadcastSymbol = symbol;
+ 
 };
 
 function RedrawCharts()
@@ -336,6 +365,7 @@ function RedrawCharts()
 
     TradingApp.init();
 
+    $('#symbollink-broadcast-box').hide();
     $('#help-modal').modal("show");
 
     UpdateChartHeight();
@@ -367,8 +397,17 @@ function RedrawCharts()
       $('#alert-box').is(":visible") == true ? $('#alert-box').hide() : $('#alert-box').show();
     });
 
+    $('#symbollink-btn').click(function(ev) {
+      $('#symbollink-box').is(":visible") == true ? $('#symbollink-box').hide() : $('#symbollink-box').show();
+    });     
+
     $('#alert-box').on('close.bs.alert', function () {
       $('#alert-box').hide();
+      return false;
+    });
+
+    $('#symbollink-box').on('close.bs.alert', function () {
+      $('#symbollink-box').hide();
       return false;
     });
 
@@ -423,6 +462,15 @@ function RedrawCharts()
 
       return false;
 
+    });
+
+    $('#place-trade-modal').on('show.bs.modal', function (ev) {
+      $('#form-symbol').val(lastBroadcastSymbol);
+    });
+
+    $(TradingApp.SymbolLink).bind("onChanged", function(ev, newSymbol) {
+      $('#symbollink-symbol').html(newSymbol); 
+      $('#symbollink-box').show();
     });
 
     $(TradingApp.Accounts).bind("onUpdate", function(ev, reason, accountID) {
@@ -529,6 +577,8 @@ function RedrawCharts()
             var item = TradingApp.Orders.item($(this).data('orderid'));
             var listContent = "";
 
+            BroadcastSymbol(item.Symbol);
+
             $("#details-content").html("");
 
             listContent += "<table class='table'>";
@@ -583,6 +633,8 @@ function RedrawCharts()
         var item = TradingApp.Positions.item($(this).text());
         var listContent = "";
 
+        BroadcastSymbol(item.Symbol);
+
         $("#details-content").html("");
 
         listContent += "<table class='table'>";
@@ -618,18 +670,25 @@ function RedrawCharts()
 
     $(TradingApp.SymbolList).bind("onAdd", function(ev, symbollistitems) {
       var symbolText = "";
+      var _parent = this;
+      var timeout = null;
 
       symbolText += "<ul class='media-list'>"
 
       for (var x = 0; x < symbollistitems.length; x++) {
-        symbolText += "<li class='media'>";
+        symbolText += "<li class='media'><a class='btn btn-primary symbollink-broadcast'>";
         symbolText += symbollistitems[x];
-        symbolText += "</li>";
+        symbolText += "</a></li>";
       }
 
       symbolText += "</ul>";
 
       $('#slList').html(symbolText);
+
+      // Use the symbols in the symbol list to generate symbol link broadcasts
+      $('.symbollink-broadcast').unbind("click").click(function(ev) {
+        BroadcastSymbol($(this).html());
+      });
 
     });
 

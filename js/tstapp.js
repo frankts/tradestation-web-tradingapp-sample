@@ -24,11 +24,57 @@ var TradingApp = {
 			var _parent = TradingApp;
 			
 			_parent._HashtagQueue.init();
+			_parent.SymbolLink.request();
 			_parent.Accounts.request();
 			_parent.Positions.request();			
 			_parent.Orders.request();			
 			_parent.Orders.Ticket.request();			
 		}, 0);
+	},
+
+	SymbolLink: {
+		request: function() {
+			// `request` requests, asynchronously, the current list of accounts. 
+			var _parent = this;
+
+			TradingApp._call( function() { window.location.href = _parent._hashes._symbol; } );
+		},
+
+		broadcast: function(symbol) {
+			// `request` requests, asynchronously, the current list of accounts. 
+			var _parent = this;
+
+			TradingApp._call( function() { window.location.href = _parent._hashes._broadcast + symbol + ";"; } );
+		},
+
+		_symbol: "",
+
+		_hashes: {
+			_broadcast: "#SC:BROADCAST=",
+			_symbol: "#SC:AN=SYMBOL;"
+		},	
+
+		delegates: function() {
+			//  *`delegates` provide a callback mechanism for EasyLanguage. These methods are considered private and should not be called directly.*
+			var _parent = this;
+
+			return {
+
+				changed: function(newSymbol) {	
+
+					_parent._symbol = newSymbol;
+
+					setTimeout(function(){ $(TradingApp.SymbolLink).trigger("onChanged", [newSymbol]);}, null);
+
+				},
+
+				next: function()
+				{
+					TradingApp._next();
+				}
+			};
+		}
+
 	},
 
 	Accounts: {
@@ -556,6 +602,14 @@ function TradingAppSymbolListDelegateAdd(symbollistitems){
 
 function TradingAppSymbolListDelegateNext(){
 	TradingApp.SymbolList.delegates().next();
+};
+
+function TradingAppSymbolLinkDelegateChanged(newSymbol){
+	TradingApp.SymbolLink.delegates().changed(newSymbol);
+};
+
+function TradingAppSymbolLinkDelegateNext(){
+	TradingApp.SymbolLink.delegates().next();
 };
 
 // The MIT License (MIT)
