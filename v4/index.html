@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Web TradingApp</title>
+
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+  <link id="theme" rel="stylesheet" type="text/css" href="./css/dark/bootstrap.min.css">
+
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+
+  <script type="text/javascript" src="./js/tstapp.js"></script>  
+  <script type="text/javascript" src="./js/tstapp-graphs.js"></script> 
+  <style>
+
+  .dynamic-chart {
+    width: 100%;
+    height: 10px;
+  }
+
+  .ts-full-width {
+    width: 100%;
+  }
+
+  .ts-toolbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 48px;
+    height: 100%;
+  }
+
+  .ts-toolbar-btn {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .ts-toolbar-push {
+    margin-left: 48px;
+    margin-top: 10px;
+  }
+
+  </style>
+</head>
+<body oncontextmenu="return false;">
+
+  <div class="ts-toolbar panel">
+    <ul class="nav nav-pills nav-stacked" role="tablist" id="tabbed-views">
+      <li class="active"><a title="Positions" href="#positions_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-map-marker"></span></a></li>  
+      <li><a title="Orders" href="#orders_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-flash"></span></a></li>
+      <li><a title="Accounts" href="#accounts_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-usd"></span></a></li>
+      <li><a title="SymbolList" href="#symbollist_tab" role="tab" data-toggle="tab"><span class="glyphicon glyphicon-list"></span></a></li>
+    </ul> 
+    <hr/>
+    <a title="Place a trade" type="button" class="btn btn-primary ts-full-width ts-toolbar-btn" data-toggle="modal" data-target="#place-trade-modal"><span class="glyphicon glyphicon-plus-sign"></span></a>
+    <a title="Display an alert" type="button" class="btn btn-warning ts-full-width ts-toolbar-btn" id="alert-btn"><span class="glyphicon glyphicon-exclamation-sign"></span></a>
+    <a title="Current symbol" type="button" class="btn btn-info ts-full-width ts-toolbar-btn" id="symbollink-btn"><span class="glyphicon glyphicon glyphicon-font"></span></a>
+    <a title="Settings" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" data-toggle="modal" data-target="#settings-modal"><span class="glyphicon glyphicon-cog"></span></a>
+    <a title="Refresh" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="refresh-btn"><span class="glyphicon glyphicon-refresh"></span></a>
+    <a title="Toggle full window view" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="full-size-btn"><span class="glyphicon glyphicon-fullscreen"></span></a>
+    <a title="Toggle Light/Dark theme" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="theme-btn"><span class="glyphicon glyphicon-adjust"></span></a>
+    <a title="Help - About" type="button" class="btn btn-default ts-full-width ts-toolbar-btn" id="help-btn"><span class="glyphicon glyphicon-question-sign"></span></a>
+  </div>
+
+  <div class="container-fluid ts-toolbar-push">
+    <div id="symbollink-box" class="alert alert-info" role="alert">
+        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <h4> Symbol Changed - Current Symbol = <span style="font-weight: bold" id="symbollink-symbol">...</span></h4> 
+        <p>This is usually happens when you first open this window or by creating a SymbolLinking association in the TradeStation Platform.</p>
+    </div>
+    <div id="symbollink-broadcast-box" class="alert alert-success" role="alert">
+        <h4>Broadcasting Symbol - <span id="symbollink-broadcast-symbol">...</span></h4> 
+        <p>If other platform windows are linked, they will receive this symbol broadcast.</p>
+    </div>
+    <div id="alert-box" class="alert alert-warning alert-dismissible" role="alert">
+      <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+      <h4><span class="glyphicon glyphicon-exclamation-sign"></span> Display notifications here.</h4> 
+      <p>Use the top of the window for notifications and confirmations.</p>
+      <br/>
+      <button type="button" class="btn btn-primary" data-dismiss="alert">Dismiss</button>
+      <button type="button" class="btn btn-info" data-dismiss="alert">Yes</button>
+      <button type="button" class="btn btn-default" data-dismiss="alert">No</button>
+      <button type="button" class="btn btn-success" data-dismiss="alert">OK</button>
+      <button type="button" class="btn btn-danger" data-dismiss="alert">Cancel</button>
+    </div>
+    <div class="row">
+      <div class="col-md-12">
+        <div class="tab-content">
+          <div class="tab-pane" id="accounts_tab">      
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div id="accounts-chart" class="dynamic-chart"></div>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Actions</div>
+                  <div class="panel-body">
+                    <button type="button" class="btn btn-primary ts-full-width" data-toggle="modal" data-target="#place-trade-modal">Place Trade</button>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Accounts</div>
+                  <div class="panel-body">
+                    <div id="account-list">No accounts available.</div>
+                  </div>
+                </div>   
+
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane" id="orders_tab">
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div id="orders-chart" class="" style="width: 100%; height: 220px;"></div>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Actions</div>
+                  <div class="panel-body">
+                    <button type="button" class="btn btn-primary ts-full-width" data-toggle="modal" data-target="#place-trade-modal">Place Trade</button>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Orders</div>
+                  <div class="panel-body">
+                    <div id="orderList">No orders placed today.</div>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Order Ticket</div>
+                  <div class="panel-body">
+                    <div id="orderTicket"></div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane active" id="positions_tab">
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div id="positions-chart" class="dynamic-chart"></div>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Actions</div>
+                  <div class="panel-body">
+                    <button type="button" class="btn btn-primary ts-full-width" data-toggle="modal" data-target="#place-trade-modal">Place Trade</button>
+                  </div>
+                </div>
+
+                <div class="panel panel-default">
+                  <div class="panel-heading">Open positions</div>
+                  <div class="panel-body">
+                    <div class="accordion" id="ppAccord"></div>
+                    <div id="positionList">No positions available.</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane" id="symbollist_tab">
+            <div class="row">
+
+              <div class="col-md-9 expand-when-full-size">
+                <div class="" id="slList">No symbols selected.</div>
+                <br/>
+              </div>
+              <div class="col-md-3 hide-when-full-size">
+
+                  <div class="panel panel-default">
+                    <div class="panel-heading">Actions</div>
+                    <div class="panel-body">
+                      <button id="symbollist_request" type="button" class="btn btn-primary ts-full-width">Choose a list</button>
+                    </div>
+                  </div>
+
+                  <div class="panel panel-default">
+                    <div class="panel-heading">Instructions</div>
+                    <div class="panel-body">
+                      <p>Click the "Choose a list" button to bring up the symbollist dialog. Select a list and click "OK".</p>
+                      <p>You can also test the SymbolLinking functionality by linking this window to another platform window, like Chart Analysis, and clicking on each symbol displayed once you have selected a list.</p>
+                    </div>
+                  </div>
+
+              </div>             
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="place-trade-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+              <h3><span class="glyphicon glyphicon-plus-sign"></span> Place a trade</h3>
+            </div>
+            <div class="modal-body">
+              <form class="form">
+                <div class="form-group">
+                  <input id="form-symbol" class="form-control" name="Symbol" placeholder="e.g. AAPL,MSFT,etc." type="text" value="" />
+                </div>
+                <div class="form-group">
+                  <input id="form-quantity" class="form-control" name="Quantity" placeholder="" type="text" value="100" />
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-duration">                  
+                    <option value="DAY">DAY</option>
+                    <option value="DAY+">DAY+</option>
+                    <option value="GTC">GTC</option>
+                    <option value="GTC+">GTC+</option>
+                    <option value="GTD">GTD</option>
+                    <option value="GTD+">GTD+</option>
+                    <option value="FOK">FOK</option>
+                    <option value="IOC">IOC</option>
+                    <option value="OPG">OPG</option>
+                    <option value="1 Min">1 Min</option>
+                    <option value="3 Min">3 Min</option>
+                    <option value="5 Min">5 Min</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-type">
+                    <option value="market">market</option>
+                    <option value="limit">limit</option>
+                    <option value="stoplimit">stoplimit</option>
+                    <option value="stopmarket">stopmarket</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-account">
+                    <option value="unknown">No accounts specified</option>
+                  </select>     
+                </div>
+                <div class="form-group">
+                  <select class="form-control" id="form-action">
+                    <option value="buy">buy</option>
+                    <option value="sell">sell</option>
+                    <option value="sellshort">sellshort</option>
+                    <option value="buytocover">buytocover</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <a id="send-order" href="#OT" class="btn btn-primary">Send order</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="details-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">      
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3>Details</h3>
+          </div>
+          <div class="modal-body" id="details-content">
+          </div>
+          <div class="modal-footer">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="settings-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">      
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3><span class="glyphicon glyphicon-cog"></span> Settings</h3>
+          </div>
+          <div class="modal-body">
+            Display the settings of your application here.
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" data-dismiss="modal" class="btn btn-primary">Apply</button>
+            <button class="btn btn-default" data-dismiss="modal" class="btn btn-primary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>    
+
+    <div class="modal fade" id="help-modal">
+      <div class="modal-dialog">
+        <div class="modal-content">      
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h3><span class="glyphicon glyphicon-question-sign"></span> Sample Web TradingApp</h3>
+          </div>
+          <div class="modal-body">
+            <p>This TradingApp is an example of how to create a TradeStation TradingApp that leverages HTML for its user experience. The code includes a sample javascript library which provides objects that make it easy to request information regarding Accounts, Orders, and Positions.</p>
+            <br/>
+            <p>Please visit <a target="_blank" href="http://developer.tradestation.com">http://developer.tradestation.com</a> for more information.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-default" data-dismiss="modal" class="btn btn-primary">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>       
+
+<script type="text/javascript">
+
+var chartHighlightColor  = "#ffffff";
+var chartTitleColor      = "#ffffff";
+var darkTheme            = "./css/dark/bootstrap.min.css";
+var lightTheme           = "./css/light/bootstrap.min.css";
+var symbolLinkBoxTimeout = null;
+var lastBroadcastSymbol  = "";
+
+function UpdateChartHeight()
+{
+  $('.dynamic-chart').css('height', (window.innerHeight.toString() - 20) + 'px'); 
+};
+
+function UpdateChartColors()
+{
+    chartHighlightColor = $('.btn-primary').css("background-color");
+    chartTitleColor     = $('.panel-heading').css("color");
+};
+
+function BroadcastSymbol(symbol) {
+  var _parent = this;
+  var timeout = null;
+
+  // Use the symbols in the symbol list to generate symbol link broadcasts
+  TradingApp.SymbolLink.broadcast(symbol);
+  $('#symbollink-broadcast-symbol').html(symbol);
+  $('#symbollink-broadcast-box').show();
+  
+  clearTimeout(symbolLinkBoxTimeout);
+  symbolLinkBoxTimeout = setTimeout(function(){$('#symbollink-broadcast-box').hide();}, 3000);
+
+  lastBroadcastSymbol = symbol;
+ 
+};
+
+function RedrawCharts()
+{
+  drawAccounts();
+  drawOrders();
+  drawPositions();
+};
+
+  $(document).ready(function(){
+
+    TradingApp.init();
+
+    $('#symbollink-broadcast-box').hide();
+    $('#help-modal').modal("show");
+
+    UpdateChartHeight();
+    UpdateChartColors();
+
+    $('#theme-btn').click(function(ev) {
+
+      if($('#theme-btn').hasClass('active'))
+      {
+        $("link[id=theme]").attr({href : darkTheme});
+        $('#theme-btn').removeClass('active');
+      }
+      else
+      {
+        $("link[id=theme]").attr({href : lightTheme});
+        $('#theme-btn').addClass('active');
+      }
+
+      setTimeout(UpdateChartColors, 0);
+      setTimeout(RedrawCharts, 0);
+
+    });
+
+    $('#help-btn').click(function(ev) {
+      $('#help-modal').modal("show"); 
+     });
+
+    $('#alert-btn').click(function(ev) {
+      $('#alert-box').is(":visible") == true ? $('#alert-box').hide() : $('#alert-box').show();
+    });
+
+    $('#symbollink-btn').click(function(ev) {
+      $('#symbollink-box').is(":visible") == true ? $('#symbollink-box').hide() : $('#symbollink-box').show();
+    });     
+
+    $('#alert-box').on('close.bs.alert', function () {
+      $('#alert-box').hide();
+      return false;
+    });
+
+    $('#symbollink-box').on('close.bs.alert', function () {
+      $('#symbollink-box').hide();
+      return false;
+    });
+
+    $('#full-size-btn').click(function(ev){
+
+      if($('#full-size-btn').hasClass('active'))
+      {
+        $('.expand-when-full-size').removeClass("col-md-12");
+        $('.expand-when-full-size').addClass("col-md-9");
+
+        $('.hide-when-full-size').show();
+
+
+        $('#full-size-btn').removeClass('active');
+      }
+      else
+      {
+
+        $('.expand-when-full-size').removeClass("col-md-9");
+        $('.expand-when-full-size').addClass("col-md-12");
+
+        $('.hide-when-full-size').hide();
+
+        $('#full-size-btn').addClass('active');
+      }
+
+      drawAccounts();
+      drawOrders();
+      drawPositions();
+
+      return false;
+    });
+
+    $('#refresh-btn').click(function(ev){
+      window.location = window.location.href.substr(0, window.location.href.indexOf('#'))
+    });
+
+    $('#send-order').click(function(ev){
+
+      var ticket = TradingApp.Orders.Ticket.ticket;
+
+      ticket.Symbol = $('#form-symbol').val();
+      ticket.Duration = $('#form-duration option:selected').val();
+      ticket.Type = $('#form-type option:selected').val();
+      ticket.Account = $('#form-account option:selected').val();
+      ticket.Quantity = parseInt($('#form-quantity').val());
+      ticket.Action = $('#form-action option:selected').val();
+
+      TradingApp.Orders.Ticket.send(ticket);
+
+      $('#place-trade-modal').modal('hide');
+
+      return false;
+
+    });
+
+    $('#place-trade-modal').on('show.bs.modal', function (ev) {
+      $('#form-symbol').val(lastBroadcastSymbol);
+    });
+
+    $(TradingApp.SymbolLink).bind("onChanged", function(ev, newSymbol) {
+      $('#symbollink-symbol').html(newSymbol); 
+      $('#symbollink-box').show();
+    });
+
+    $(TradingApp.Accounts).bind("onUpdate", function(ev, reason, accountID) {
+
+      var items = TradingApp.Accounts.items();
+      var listHTML = "";
+
+      $('#account-list').html("");
+      $('#form-account').html("");
+
+      listHTML += "<div class='btn-group-vertical ts-full-width'>";
+
+      for (var x = 0; x < items.length; x++) {
+
+        listHTML += "<button class='account-details btn btn-primary'>"+items[x].AccountID+"</button>";
+        $('#form-account').append('<option value="'+ items[x].AccountID + '">'+ items[x].AccountID + ' (' + items[x].Type + ')</option>');
+      }
+
+      listHTML += "</div>"; 
+
+      $('#account-list').append(listHTML);
+
+
+      $(".account-details").unbind("click").click(function(ev) {
+
+        var item = TradingApp.Accounts.item($(this).text());
+        var listContent = "";
+
+        $("#details-content").html("");
+
+        listContent += "<table class='table'>";
+
+        for( var property in item)
+        {           
+          listContent += '<tr><td>' + property + '</td>';
+          listContent += '<td>' + item[property] + '</td></tr>';
+        }
+
+        listContent += "</table>";
+
+        $("#details-content").html(listContent);
+        $('#details-modal').modal('show');
+      });     
+
+      accountsLoaded = true;
+      drawAccounts();
+    });
+
+
+    $(TradingApp.Orders.Ticket).bind("onLoad", function(ev, ticket) {
+     $('#orderTicket').html("<button class='order-ticket-details btn btn-primary ts-full-width'>Details</button>");
+
+     $(".order-ticket-details").unbind("click").click(function(ev) {
+
+      var item = TradingApp.Orders.Ticket.ticket;
+      var listContent = "";
+
+      $("#details-content").html("");
+
+      listContent += "<table class='table'>";
+
+      for( var property in item)
+      {           
+        listContent += '<tr><td>' + property + '</td>';
+        listContent += '<td>' + item[property] + '</td></tr>';
+      }
+
+      listContent += "</table>";
+
+      $("#details-content").html(listContent);
+      $('#details-modal').modal('show');
+    }); 
+
+    });
+
+    $(TradingApp.Orders).bind("onUpdate", function(ev, reason, orderID) {
+
+      var items = TradingApp.Orders.items();
+      var listHTML = "";
+
+      $('#orderList').html("");
+
+      listHTML += "<div class='btn-group-vertical ts-full-width'>";
+
+      for (var x = 0; x < items.length; x++) {
+
+        listHTML += "<button class='order-details btn ";
+
+            // Change the color of the button if is has not been filled.
+            if(items[x].FilledQuantity != items[x].EnteredQuantity && items[x].State == "queued")
+              listHTML += "btn-warning";
+            else
+              listHTML += "btn-primary";
+
+            listHTML += "' data-orderid='"+ items[x].OrderID + "'>"+ items[x].Symbol +" - "+ items[x].OrderID +"</button>";
+          }
+
+          listHTML += "</div>"; 
+
+          $('#orderList').append(listHTML);
+
+          $(".order-details").unbind("click").click(function(ev) {
+
+            var item = TradingApp.Orders.item($(this).data('orderid'));
+            var listContent = "";
+
+            BroadcastSymbol(item.Symbol);
+
+            $("#details-content").html("");
+
+            listContent += "<table class='table'>";
+
+            if(item.FilledQuantity != item.EnteredQuantity && item.State == "queued")
+              listContent += '<tr><td>Cancel</td><td><button class="cancel_order btn btn-danger" data-orderid="' + item.OrderID + '" >Cancel</button></td></tr>';
+
+
+            for( var property in item)
+            {           
+              listContent += '<tr><td>' + property + '</td>';
+              listContent += '<td>' + item[property] + '</td></tr>';
+            }
+
+            listContent += "</table>";
+
+            $("#details-content").html(listContent);
+            $('#details-modal').modal('show');
+
+            $('.cancel_order').unbind("click").click(function(ev){
+              TradingApp.Orders.cancel($(this).data("orderid"));
+              $('#details-modal').modal('hide');
+            });
+
+          }); 
+
+          ordersLoaded = true;
+          drawOrders();
+        });  
+
+    $(TradingApp.Positions).bind("onUpdate", function(ev, reason, positionID) {
+
+
+      var items = TradingApp.Positions.items();
+      var listHTML = "";
+
+      $('#positionList').html("");
+
+      listHTML += "<div class='btn-group-vertical ts-full-width'>";
+
+      for (var x = 0; x < items.length; x++) {
+
+        listHTML += "<button class='position-details btn btn-primary'>"+ items[x].PositionID +"</button>";
+      }
+
+      listHTML += "</div>"; 
+
+      $('#positionList').append(listHTML);
+
+      $(".position-details").unbind("click").click(function(ev) {
+
+        var item = TradingApp.Positions.item($(this).text());
+        var listContent = "";
+
+        BroadcastSymbol(item.Symbol);
+
+        $("#details-content").html("");
+
+        listContent += "<table class='table'>";
+
+        listContent += '<tr><td>Close</td><td><button class="close_position btn btn-danger" data-positionid="' + item.PositionID + '" >Close</button></td></tr>';
+
+        for( var property in item)
+        {           
+          listContent += '<tr><td>' + property + '</td>';
+          listContent += '<td>' + item[property] + '</td></tr>';
+        }
+
+        listContent += "</table>";
+
+        $("#details-content").html(listContent);
+        $('#details-modal').modal('show');
+
+        $('.close_position').unbind("click").click(function(ev){
+          TradingApp.Positions.close($(this).data("positionid"));
+          $('#details-modal').modal('hide');
+        });
+
+      }); 
+
+
+      positionsLoaded = true;
+      drawPositions();
+    });
+
+    $("#symbollist_request").click(function(ev) {
+      TradingApp.SymbolList.request();
+    });
+
+    $(TradingApp.SymbolList).bind("onAdd", function(ev, symbollistitems) {
+      var symbolText = "";
+      var _parent = this;
+      var timeout = null;
+
+      symbolText += "<ul class='media-list'>"
+
+      for (var x = 0; x < symbollistitems.length; x++) {
+        symbolText += "<li class='media'><a class='btn btn-primary symbollink-broadcast'>";
+        symbolText += symbollistitems[x];
+        symbolText += "</a></li>";
+      }
+
+      symbolText += "</ul>";
+
+      $('#slList').html(symbolText);
+
+      // Use the symbols in the symbol list to generate symbol link broadcasts
+      $('.symbollink-broadcast').unbind("click").click(function(ev) {
+        BroadcastSymbol($(this).html());
+      });
+
+    });
+
+    window.onresize = function() {
+      UpdateChartHeight();
+      drawAccounts();
+      drawOrders();
+      drawPositions();     
+    };
+
+    $('#tabbed-views a').click(function (e) {
+      e.preventDefault();
+      $(this).tab('show');
+
+      drawAccounts();
+      drawOrders();
+      drawPositions();
+    });
+
+    // remove the divs if IE7
+    if(window.isOldIE != null)
+    {
+      $('#accounts-chart').hide();  
+      $('#orders-chart').hide();
+      $('#positions-chart').hide();
+    }
+  });
+
+</script>
+
+</body>
+</html>
