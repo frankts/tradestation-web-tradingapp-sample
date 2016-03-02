@@ -22,10 +22,7 @@ Example:
 
 ##Getting Started
 
-To get started, download the [SAMPLEWEBTRADINGAPP.ELD](https://github.com/frankts/tradestation-web-tradingapp-sample/blob/master/SAMPLEWEBTRADINGAPP.ELD?raw=true) and import it into the TradeStation Desktop Platform, version **9.1 Update 27** or greater.
-
-For SymbolLinking support, download [SAMPLEWEBTRADINGAPP-95U10.ELD](https://github.com/frankts/tradestation-web-tradingapp-sample/blob/master/SAMPLEWEBTRADINGAPP-95U10.ELD?raw=true). You must have TradeStation 9.5 Update 10 or greater for this sample to work. To help illustrate SymbolLinking, please download [SAMPLEWEBTRADINGAPP-95U10.TSW](https://github.com/frankts/tradestation-web-tradingapp-sample/blob/master/SAMPLEWEBTRADINGAPP-95U10.TSW?raw=true) workspace and open it in the platform.
-
+To get started, make sure you have installed TradeStation 9.5 Update 14 and download the [SAMPLEWEBTRADINGAPP-95U14.ELD](https://github.com/frankts/tradestation-web-tradingapp-sample/blob/master/SAMPLEWEBTRADINGAPP-95U14.ELD?raw=true) and import it into the TradeStation Desktop Platform, version **9.5 Update 14** or greater.
 
 You can try the sample by launching the TradeStation Desktop Platform and selecting the File-New TradingApp Window... menu sequence. In the dialog, look for the TradingApp named "Sample Web TradingApp" and click on it to launch it. You may also launch the TradeStation Development Environment (named EasyLanguage in the same dialog) to view the source code for EasyLanguage portion of this TradingApp.
 
