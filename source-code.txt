@@ -11,7 +11,8 @@ using elsystem.collections;
 using platform;
  
 vars:
-	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v4/index.html"),  	
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v95-u14/index.html"),  	
+	bool isWebPageLoaded(false),
 	Form mainForm(null), 
 	WebBrowser web(null),
 	ProgressBar progress(null),
@@ -76,6 +77,8 @@ begin
 		print("URL -> " + args.Url);
 		
 	progress.Visible = true; 
+	
+	isWebPageLoaded = true;
 	
 	if IsHashUrl(args.Url) then
 		EvaluateURL(args.Url);	
@@ -784,13 +787,12 @@ end;
 method void AccountsProvider1_StateChanged( elsystem.Object sender, tsdata.common.StateChangedEventArgs args ) 
 var: Dictionary dict;
 begin
-	If web.Document <> null then
-		web.Document.InvokeScript(JS_AP_CALLBACK + "Status", args.NewState.ToString(), args.OldState.ToString());
+	//	web.Document.InvokeScript(JS_AP_CALLBACK + "Status", args.NewState.ToString(), args.OldState.ToString());
 end;
 
 method void AccountsProvider1_Updated( elsystem.Object sender, tsdata.trading.AccountUpdatedEventArgs args ) 
 begin
-	if args.Reason <> tsdata.trading.AccountUpdateReason.realtimeupdate and web.Document <> null then
+	if args.Reason <> tsdata.trading.AccountUpdateReason.realtimeupdate and isWebPageLoaded <> false and args.Account <> null then
 	begin
 		if displayDebugInfo then
 			print(args.Reason.ToString());
