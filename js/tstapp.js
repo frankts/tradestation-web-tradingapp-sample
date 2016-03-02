@@ -457,30 +457,24 @@ var TradingApp = {
 	_HashtagQueue: {
 		//  *`_HashtagQueue` is used to ensure that requests do not invalidate each other by only working one request at a time. This is temporary until we implement a native JavaScript callback to EasyLangauge.*
 		_queue: [],
-		isProcessing: false,
 
 		add: function(fn) {
 			this._queue.push(fn);
 		},
 
 		process: function() {
-			if(this.isProcessing == false)
+			var fn = null;
+
+			if(this._queue.length > 0)
+				fn = this._queue.shift();
+
+			if(fn != null)
 			{
-				var fn = null;
-
-				if(this._queue.length > 0)
-					fn = this._queue.shift();
-
-				if(fn != null)
-				{
-					fn();
-					this.isProcessing = true;
-				}				
-			}
+				fn();					
+			}				
 		},
 
 		next: function() {
-			this.isProcessing = false;
 			this.process();
 		},
 

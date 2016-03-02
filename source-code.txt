@@ -1,1 +1,1246 @@
-//-----------------------------------------------------------------------------// Sample Web TradingApp //// This sample illustrates the ability for a web browser to interact with // EasyLanguage using hashtags in the url and javascript function calls.//-----------------------------------------------------------------------------using elsystem.windows.forms;using elsystem.drawing;using elsystem.collections;using platform; vars:	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v4/index.html"),  		Form mainForm(null), 	WebBrowser web(null),	ProgressBar progress(null),	bool displayDebugInfo(false),	SymbolListDialog slDialog(null),	SymbolLinking symbolLink(null),	intrabarpersist string currentSymbol(""),	string JS_AP_CALLBACK("TradingAppAccountsDelegate"),	string JS_OT_CALLBACK("TradingAppOrdersTicketDelegate"),	string JS_OP_CALLBACK("TradingAppOrdersDelegate"),	string JS_PP_CALLBACK("TradingAppPositionsDelegate"),	string JS_SL_CALLBACK("TradingAppSymbolListDelegate"),	string JS_SC_CALLBACK("TradingAppSymbolLinkDelegate");	method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) var: int x, Dictionary dict;begin	currentSymbol = symbol;		symbolLink = SymbolLinking.Create();	symbolLink.SetContext += symbolLink_SetContext;	symbolLink.GetContext += symbolLink_GetContext;		web = WebBrowser.Create(100, 100);	web.Dock = DockStyle.fill;		progress = ProgressBar.Create(1,8); 	progress.Dock = DockStyle.bottom;	progress.Maximum = 0;	progress.Maximum = 100;	progress.Value = 100;		mainForm = Form.Create("TradingAppJSForm", 100, 100); 	mainForm.Dock = DockStyle.right;		mainForm.AddControl(progress);	mainForm.AddControl(web);	 		web.AllowWebBrowserDrop = false;	web.ScriptErrorsSuppressed = false;		web.DocumentCompleted += web_DocumentCompleted;	web.ProgressChanged += web_ProgressChanged; 	web.Navigating += web_Navigating; 			AccountsProvider1.statechanged += AccountsProvider1_StateChanged;	AccountsProvider1.updated += AccountsProvider1_Updated;		web.Navigate(url);		mainForm.Show();		progress.Visible = false; 			 end;method void web_Navigating( elsystem.Object sender, elsystem.windows.forms.WebBrowserNavigatingEventArgs args )var: int hashLocation, int startLocation;begin  		if displayDebugInfo then		print("URL -> " + args.Url);			progress.Visible = true; 		if IsHashUrl(args.Url) then		EvaluateURL(args.Url);	end;method void web_ProgressChanged ( elsystem.Object sender, elsystem.EventArgs args )var:	elsystem.windows.forms.WebBrowserProgressChangedEventArgs progArgs;begin		progArgs = args astype elsystem.windows.forms.WebBrowserProgressChangedEventArgs;			progress.Minimum = 0;	progress.Maximum = progArgs.MaximumProgress;		if progArgs.CurrentProgress >= 0 then		progress.Value = progArgs.CurrentProgress;		If progress.Minimum = 0 and progress.Maximum = 0 then		progress.Visible = false	Else		progress.Visible = true;end;method void web_DocumentCompleted (elsystem.Object sender, elsystem.windows.forms.WebBrowserDocumentCompletedEventArgs args )begin	progress.Visible = false;end;method void symbolLink_GetContext ( elsystem.Object sender, platform.SymbolLinkingEventArgs args )begin	// You will need to manage your own symbol if using SymbolLinking and referring to a symbol	// as your current symbol that is different than the keyword "symbol". Keep track of your symbol	// by creating your own variable (intrabar persist) and assigning that variable a expressed here.	args.Symbol = currentSymbol;	args.Recalculate = false;end;method void symbolLink_SetContext ( elsystem.Object sender, platform.SymbolLinkingEventArgs args )begin	currentSymbol = args.Symbol;		web.Document.InvokeScript(JS_SC_CALLBACK + "Changed", args.Symbol);	web.Document.InvokeScript(JS_SC_CALLBACK + "Next");		args.Recalculate = false;end;//--------------------------------------------------------------------------------// Check for specific hashtags//--------------------------------------------------------------------------------method bool IsHashUrl(string url)begin	//-------------------------------------	// Hashtag prefixes	//-------------------------------------	// #OT = OrderTicket	// #OP = OrdersProvider	// #PP = PositionsProvider	// #AP = AccountsProvider	// #FN = Function Call	return (instr( URL, "#SC:") > 0) or		   (instr( URL, "#OT:") > 0) or 		   (instr( URL, "#OP:") > 0) or 		   (instr( URL, "#PP:") > 0) or 		   (instr( URL, "#AP:") > 0) or 		   (instr( URL, "#SL:") > 0) or 		   (instr( URL, "#FN:") > 0); end;//--------------------------------------------------------------------------------// Inspect the URL for//--------------------------------------------------------------------------------method bool EvaluateURL(string url)vars: string fields, bool res;begin	if IsHashUrl(url) then	begin		fields = ExtractFieldsFromURL(url, "#SC:");				if (strlen(fields) > 0) then		begin			JSSymbolLink(fields);			return true;		end;				fields = ExtractFieldsFromURL(url, "#AP:");				if (strlen(fields) > 0) then		begin			JSAccountsProvider(fields);			return true;		end;					fields = ExtractFieldsFromURL(url, "#OT:");				if (strlen(fields) > 0) then		begin			JSOrderTicket(fields);			return true;		end;						fields = ExtractFieldsFromURL(url, "#OP:");				if (strlen(fields) > 0) then		begin			JSOrdersProvider(fields);			return true;		end;					fields = ExtractFieldsFromURL(url, "#PP:");				if (strlen(fields) > 0) then		begin			JSPositionsProvider(fields);			return true;		end;				fields = ExtractFieldsFromURL(url, "#SL:");				if (strlen(fields) > 0) then		begin			JSSymbolList(fields);			return true;		end;			end;		return false;end;method void JSSymbolLink(string fields)var: string field, Vector jsArr, SymbolContext symbolCtx;begin	field = FindField(fields, "AN=", ";");					if strlen(field) > 0 and upperstr(field) = "SYMBOL" then	begin		web.Document.InvokeScript(JS_SC_CALLBACK + "Changed", symbol);		web.Document.InvokeScript(JS_SC_CALLBACK + "Next");	end;		field = FindField(fields, "BROADCAST=", ";");		if strlen(field) > 0 then	begin		symbolCtx = SymbolContext.Create();		symbolCtx.Symbol = field;		symbolLink.SetSymbolContext(symbolCtx);		web.Document.InvokeScript(JS_SC_CALLBACK + "Next");	end;end;method void JSSymbolList(string fields)var: string field, Vector jsArr;begin	field = FindField(fields, "AN=", ";"); 					if strlen(field) > 0 and upperstr(field) = "DISPLAY" then	begin		slDialog = SymbolListDialog.Create();		slDialog.StatusChanged += OnSymbolList_StatusChanged;				slDialog.Show();	end;end;method void OnSymbolList_StatusChanged( elsystem.Object sender, DialogStatusChangedEventArgs args )vars: int x, Vector jsArr; begin	jsArr = Vector.Create();		For x = 0 to slDialog.Count - 1 	begin		jsArr.push_back(slDialog[x]);	end;			web.Document.InvokeScript(JS_SL_CALLBACK + "Add", VectorToJSArray(jsArr));	web.Document.InvokeScript(JS_SL_CALLBACK + "Next");end;method void JSAccountsProvider(string fields)var: string field, int x, int y, Vector jsArr;begin	field = FindField(fields, "AN=", ";"); 					if strlen(field) > 0 and upperstr(field) = "ITEMS" then	begin		UpdateAccountsJS("items", "");		end;		web.Document.InvokeScript(JS_AP_CALLBACK + "Next");end;method void JSOrderTicket(string fields)vars: string field;begin	field = FindField(fields, "AN=", ";"); 					if strlen(field) > 0 and upperstr(field) = "LOAD" then	begin		LoadOrderTicketJS(OrderTicket1);	end	else if strlen(field) > 0 and upperstr(field) = "SEND" then	begin		field = FindField(fields, "TK=", ";");		if strlen(field) > 0 then			SendOrderTicketJS(OrderTicket1, field);	end; 		web.Document.InvokeScript(JS_OT_CALLBACK + "Next");end;method void JSOrdersProvider(string fields)  vars: string field, tsdata.trading.Order order;begin	field = FindField(fields, "AN=", ";"); 					if strlen(field) > 0 and upperstr(field) = "LOAD" then	begin		UpdateOrdersJS("load");	end	else if strlen(field) > 0 and upperstr(field) = "CANCEL" then	begin		field = FindField(fields, "ID=", ";");				if strlen(field) > 0 then		begin			order = OrdersProvider1.Order[field];						if order <> null then			begin				order.Cancel();				web.Document.InvokeScript(JS_OP_CALLBACK + "Update", "cancel");			end;		end;	end	else if strlen(field) > 0 and upperstr(field) = "REPLACE" then	begin		field = FindField(fields, "ID=", ";");					if strlen(field) > 0 then		begin			order = OrdersProvider1.Order[field];						if order <> null then			begin				field = FindField(fields, "TK=", ";");								if strlen(field) > 0 then				begin						order.Replace(DictionaryToReplaceTicket(JSONToDictionary(field), tsdata.trading.ReplaceTicket.Create()));										web.Document.InvokeScript(JS_OP_CALLBACK + "Update", "replace");				end;			end;		end;	end; 		web.Document.InvokeScript(JS_OP_CALLBACK + "Next");	end;method void JSPositionsProvider(string fields)vars: string field, tsdata.trading.Position posObj, string posSymbol, string posAccount, int location;begin	field = FindField(fields, "AN=", ";"); 					if strlen(field) > 0 and upperstr(field) = "LOAD" then	begin		UpdatePositionsJS("load");	end	else if strlen(field) > 0 and upperstr(field) = "CLOSE" then	begin		field = FindField(fields, "ID=", ";");				if strlen(field) > 0 then		begin			location = instr(field, "_");					if location > 0 then			begin				posAccount = leftstr(field, location - 1);				posSymbol = rightstr(field, strlen(field)- location);			end;							posObj = PositionsProvider1.Position[posSymbol, posAccount];						if posObj <> null then			begin				posObj.Close();				web.Document.InvokeScript(JS_PP_CALLBACK + "Update", "close");			end;		end;	end;		web.Document.InvokeScript(JS_PP_CALLBACK + "Next");	end;		//#############################################################################// PositionsProvider//#############################################################################method string IDForPosition(tsdata.trading.Position posObj)begin	return posObj.AccountID + "_" + posObj.Symbol;end;method void UpdatePositionsJS(string reason)vars: int x, int y, Vector jsArr;begin 		web.Document.InvokeScript(JS_PP_CALLBACK + "Clear"); 	For x = 0 to PositionsProvider1.Count - 1 	begin		UpdatePositionJS( PositionsProvider1.Position[x], false); 	end;		 		web.Document.InvokeScript(JS_PP_CALLBACK + "Update", "reason");end;method void UpdatePositionJS(tsdata.trading.Position posObj, bool extendOnly) begin	web.Document.InvokeScript(JS_PP_CALLBACK + "Add", IDForPosition(posObj), DictionaryToJSON(PositionToDictionary(posObj)));end;method Dictionary PositionToDictionary(tsdata.trading.Position posObj)vars: Dictionary dict;begin	dict = Dictionary.Create();		dict.Add("PositionID", IDForPosition(posObj));		dict.Add("AccountID", posObj.AccountID);	dict.Add("AveragePrice", posObj.AveragePrice);	dict.Add("BigPointValue", posObj.BigPointValue);	dict.Add("ContractExpirationDate", posObj.ContractExpirationDate.Value);	dict.Add("InitialMargin", posObj.InitialMargin);	dict.Add("MaintenanceMargin", posObj.MaintenanceMargin);	dict.Add("MarketValue", posObj.MarketValue);	dict.Add("OpenPL", posObj.OpenPL);	dict.Add("OriginalCost", posObj.OriginalCost);	dict.Add("PLPerQuantity", posObj.PLPerQuantity);	dict.Add("PercentPL", posObj.PercentPL);	dict.Add("Quantity", posObj.Quantity);	dict.Add("RequiredMargin", posObj.RequiredMargin);	dict.Add("Symbol", posObj.Symbol);	dict.Add("SymbolType", posObj.SymbolType.ToString());	dict.Add("TotalCost", posObj.TotalCost);			return dict;end;// Method called on PositionsProvider1 Updated event.// The sender parameter identifies the object that fires the event.// The args parameter contains additional information about the event.// NOTE:  Do not modify the method name, return type, or input parameters.method void PositionsProvider1_Updated( elsystem.Object sender, tsdata.trading.PositionUpdatedEventArgs args ) begin	if args.Position <> null then	begin				switch ( args.Reason )		begin			case tsdata.trading.PositionUpdateReason.added: 				UpdatePositionJS( args.Position, false);							case tsdata.trading.PositionUpdateReason.initialupdate:   				UpdatePositionJS( args.Position, false);						case tsdata.trading.PositionUpdateReason.realtimeupdate:				return;							case tsdata.trading.PositionUpdateReason.removed:				web.Document.InvokeScript(JS_PP_CALLBACK + "Remove", IDForPosition(args.Position));							default:				UpdatePositionJS( args.Position, true); 			 		end;			web.Document.InvokeScript(JS_PP_CALLBACK + "Update", args.Reason.ToString(), IDForPosition(args.Position));		web.Document.InvokeScript(JS_PP_CALLBACK + "Next");	end;end;//#############################################################################// OrderProvider//#############################################################################//--------------------------------------------------------------------------------// Loop through all orders and send them to JS//--------------------------------------------------------------------------------method void UpdateOrdersJS(string reason)vars: int x, int y, Vector jsArr;begin 	web.Document.InvokeScript(JS_OP_CALLBACK + "Clear");	For x = 0 to OrdersProvider1.Count - 1 	begin		UpdateOrderJS( OrdersProvider1.Order[x], false);	end;		 	web.Document.InvokeScript(JS_OP_CALLBACK + "Update", reason, "");end;method void UpdateOrderJS(tsdata.trading.Order order, bool extendOnly)begin	web.Document.InvokeScript(JS_OP_CALLBACK + "Add", order.OrderID, DictionaryToJSON(OrderToDictionary(order)));end;method Dictionary OrderToDictionary(tsdata.trading.Order order)vars: Dictionary dict;begin	dict = Dictionary.Create();		dict.Add("OrderID", order.OrderID.ToString());		dict.Add("AccountID", order.AccountID);	dict.Add("Action", order.Action.ToString());	dict.Add("AdvanceOptions", order.AdvanceOptions);	dict.Add("AllOrNone", order.AllOrNone.ToString());	dict.Add("AvgFilledPrice", order.AvgFilledPrice);	dict.Add("BuyMinusSellPlus", order.BuyMinusSellPlus.ToString());	dict.Add("Commission", order.Commission);	dict.Add("Discretionary", order.Discretionary.ToString());	dict.Add("DiscretionaryAmount", order.DiscretionaryAmount);	dict.Add("Duration", order.Duration);	dict.Add("DurationDate", order.DurationDate.Value);	dict.Add("ECNSweep", order.ECNSweep.ToString());	dict.Add("EnteredQuantity", order.EnteredQuantity);	dict.Add("EnteredTime", order.EnteredTime.Value);	dict.Add("FilledQuantity", order.FilledQuantity);	dict.Add("FilledTime", order.FilledTime.Value);	dict.Add("GeneratingApplication", order.GeneratingApplication.ToString());	dict.Add("IfTouched", order.IfTouched.ToString());	dict.Add("IfTouchedPrice", order.IfTouchedPrice);	dict.Add("IfTouchedPriceOffset", order.IfTouchedPriceOffset);	dict.Add("IfTouchedPriceStyle", order.IfTouchedPriceStyle.ToString());	dict.Add("LeftQuantity", order.LeftQuantity);	dict.Add("LimitPrice", order.LimitPrice);	dict.Add("LimitPriceOffset", order.LimitPriceOffset);	dict.Add("LimitPriceStyle", order.LimitPriceStyle.ToString());	dict.Add("LotSize", order.LotSize);	dict.Add("NonDisplay", order.NonDisplay.ToString());	dict.Add("OCOGroupID", order.OCOGroupID);	dict.Add("OSOParentID", order.OSOParentID);	dict.Add("Originator", order.Originator);	dict.Add("Peg", order.Peg.ToString());	dict.Add("Route", order.Route);	dict.Add("ShowOnly", order.ShowOnly.ToString());	dict.Add("ShowOnlyQuantity", order.ShowOnlyQuantity);	dict.Add("SpreadName", order.SpreadName);	dict.Add("State", order.State.ToString());	dict.Add("StateDetail", order.StateDetail.ToString());	dict.Add("StopPrice", order.StopPrice);	dict.Add("StopPriceOffset", order.StopPriceOffset);	dict.Add("StopPriceStyle", order.StopPriceStyle.ToString());	dict.Add("Symbol", order.Symbol);	dict.Add("SymbolExtension", order.SymbolExtension);	dict.Add("TrailingStop", order.TrailingStop.ToString());	dict.Add("TrailingStopAmount", order.TrailingStopAmount);	dict.Add("TrailingStopValue", order.TrailingStopValue);	dict.Add("Type", order.Type.ToString());			return dict;end;// Method called on OrdersProvider1 StateChanged event.// The sender parameter identifies the object that fires the event.// The args parameter contains additional information about the event.// NOTE:  Do not modify the method name, return type, or input parameters.method void OrdersProvider1_StateChanged( elsystem.Object sender, tsdata.common.StateChangedEventArgs args ) begin	{ Insert your EasyLanguage statements below }	end;// Method called on OrdersProvider1 Updated event.// The sender parameter identifies the object that fires the event.// The args parameter contains additional information about the event.// NOTE:  Do not modify the method name, return type, or input parameters.method void OrdersProvider1_Updated( elsystem.Object sender, tsdata.trading.OrderUpdatedEventArgs args ) begin	if strlen(args.OrderID) > 0 then	begin			if displayDebugInfo then				print(args.Reason.ToString());			switch ( args.Reason )		begin			case tsdata.trading.OrderUpdateReason.added: 				UpdateOrderJS( args.Order, false);							case tsdata.trading.OrderUpdateReason.statechanged:   				UpdateOrderJS( args.Order, false);							case tsdata.trading.OrderUpdateReason.removed:				web.Document.InvokeScript(JS_OP_CALLBACK + "Remove", args.Order.OrderID);							default:				UpdateOrderJS( args.Order, true); 			 		end;			web.Document.InvokeScript(JS_OP_CALLBACK + "Update", args.Reason.ToString(), args.OrderID);		web.Document.InvokeScript(JS_OP_CALLBACK + "Next");	end;end;//#############################################################################// OrderTicket//#############################################################################method void SendOrderTicketJS(tsdata.trading.OrderTicket ot, string json)vars: Dictionary dict;begin	dict = JSONToDictionary(json);	DictionaryToOrderTicket(dict, ot);		ot.Send();		web.Document.InvokeScript(JS_OT_CALLBACK + "Send");end;method void LoadOrderTicketJS(tsdata.trading.OrderTicket ot)begin	web.Document.InvokeScript(JS_OT_CALLBACK + "Extend", DictionaryToJSON(OrderTicketToDictionary(ot)));	web.Document.InvokeScript(JS_OT_CALLBACK + "Load");end;method tsdata.trading.ReplaceTicket DictionaryToReplaceTicket(Dictionary dict, tsdata.trading.ReplaceTicket rt)vars: string field;begin	rt.IfTouched 					= DictionaryValueToBool(dict, "IfTouched", rt.IfTouched);				rt.IfTouchedPrice 				= DictionaryValueToDouble(dict, "IfTouchedPrice", rt.IfTouchedPrice);		rt.IfTouchedPriceOffset 		= DictionaryValueToInt(dict, "IfTouchedPriceOffset", rt.IfTouchedPriceOffset);	rt.IfTouchedPriceStyle 			= DictionaryValueToPriceStyle(dict, "IfTouchedPriceStyle", rt.IfTouchedPriceStyle);	rt.LimitPrice 					= DictionaryValueToDouble(dict, "LimitPrice", rt.LimitPrice);		rt.LimitPriceOffset 			= DictionaryValueToInt(dict, "LimitPriceOffset", rt.LimitPriceOffset);		rt.LimitPriceStyle 				= DictionaryValueToPriceStyle(dict, "LimitPriceStyle", rt.LimitPriceStyle);	rt.Quantity 					= DictionaryValueToInt(dict, "Quantity", rt.Quantity);	rt.StopPrice 					= DictionaryValueToDouble(dict, "StopPrice", rt.StopPrice);		rt.StopPriceOffset 				= DictionaryValueToInt(dict, "StopPriceOffset", rt.StopPriceOffset);		rt.StopPriceStyle 				= DictionaryValueToPriceStyle(dict, "StopPriceStyle", rt.StopPriceStyle);	rt.TrailingStop					= DictionaryValueToTrailingStopBehavior(dict, "TrailingStop", rt.TrailingStop);		rt.TrailingStopAmount 			= DictionaryValueToDouble(dict, "TrailingStopAmount", rt.TrailingStopAmount);			rt.Type							= DictionaryValueToOrderType( dict, "Type", rt.Type);		return rt;end;method tsdata.trading.OrderTicket DictionaryToOrderTicket(Dictionary dict, tsdata.trading.OrderTicket ot)vars: string field;begin	ot.Account 						= DictionaryValueToString(dict, "Account", ot.Account);	 	ot.Action 						= DictionaryValueToOrderAction(dict, "Action", ot.Action);	ot.AllOrNone 					= DictionaryValueToBool(dict, "AllOrNone", ot.AllOrNone);			ot.BuyMinusSellPlus 			= DictionaryValueToBool(dict, "BuyMinusSellPlus", ot.BuyMinusSellPlus); 	ot.ConvertInvalidStopToMarket 	= DictionaryValueToBool(dict, "ConvertInvalidStopToMarket", ot.ConvertInvalidStopToMarket);		ot.Discretionary 				= DictionaryValueToBool(dict, "Discretionary", ot.Discretionary);				ot.DiscretionaryAmount 			= DictionaryValueToDouble(dict, "DiscretionaryAmount", ot.DiscretionaryAmount);				ot.Duration 					= DictionaryValueToString(dict, "Duration", ot.Duration);				ot.DurationDate 				= DictionaryValueToDateTime(dict, "DurationDate", ot.DurationDate);	ot.ECNSweep 					= DictionaryValueToBool(dict, "ECNSweep", ot.ECNSweep);		ot.IfTouched 					= DictionaryValueToBool(dict, "IfTouched", ot.IfTouched);				ot.IfTouchedPrice 				= DictionaryValueToDouble(dict, "IfTouchedPrice", ot.IfTouchedPrice);		ot.IfTouchedPriceOffset 		= DictionaryValueToInt(dict, "IfTouchedPriceOffset", ot.IfTouchedPriceOffset);	ot.IfTouchedPriceStyle 			= DictionaryValueToPriceStyle(dict, "IfTouchedPriceStyle", ot.IfTouchedPriceStyle);	ot.LimitPrice 					= DictionaryValueToDouble(dict, "LimitPrice", ot.LimitPrice);		ot.LimitPriceOffset 			= DictionaryValueToInt(dict, "LimitPriceOffset", ot.LimitPriceOffset);		ot.LimitPriceStyle 				= DictionaryValueToPriceStyle(dict, "LimitPriceStyle", ot.LimitPriceStyle);	ot.NonDisplay 					= DictionaryValueToBool(dict, "NonDisplay", ot.NonDisplay);	ot.Peg 							= DictionaryValueToPegBehavior(dict, "Peg", ot.Peg);	ot.Quantity 					= DictionaryValueToInt(dict, "Quantity", ot.Quantity);	ot.Route 						= DictionaryValueToString(dict, "Route", ot.Route);	ot.ShowOnly 					= DictionaryValueToBool(dict, "ShowOnly", ot.ShowOnly);	ot.ShowOnlyQuantity 			= DictionaryValueToInt(dict, "ShowOnlyQuantity", ot.ShowOnlyQuantity);		ot.StopPrice 					= DictionaryValueToDouble(dict, "StopPrice", ot.StopPrice);		ot.StopPriceOffset 				= DictionaryValueToInt(dict, "StopPriceOffset", ot.StopPriceOffset);		ot.StopPriceStyle 				= DictionaryValueToPriceStyle(dict, "StopPriceStyle", ot.StopPriceStyle);	ot.Symbol 						= DictionaryValueToString(dict, "Symbol", ot.Symbol);	ot.SymbolType 					= DictionaryValueToSecurityType(dict, "SymbolType", ot.SymbolType);	ot.TrailingStop					= DictionaryValueToTrailingStopBehavior(dict, "TrailingStop", ot.TrailingStop);	ot.TrailingStopAmount 			= DictionaryValueToDouble(dict, "TrailingStopAmount", ot.TrailingStopAmount);			ot.Type							= DictionaryValueToOrderType( dict, "Type", ot.Type);		return ot;end;method Dictionary OrderTicketToDictionary(tsdata.trading.OrderTicket ot)vars: Dictionary dict;begin	dict = Dictionary.Create();		dict.Add("TicketType", ot.TicketType.ToString());	dict.Add("OrderPlacementEnabled", ot.OrderPlacementEnabled.ToString());	dict.Add("Account", ot.Account);	dict.Add("Action", ot.Action.ToString());	// dict.Add("ActivationRules", ot.ActivationRules.ToString());	dict.Add("AllOrNone", ot.AllOrNone.ToString());	dict.Add("BuyMinusSellPlus", ot.BuyMinusSellPlus.ToString());	dict.Add("ConvertInvalidStopToMarket", ot.ConvertInvalidStopToMarket.ToString());	dict.Add("Discretionary", ot.Discretionary.ToString());	dict.Add("DiscretionaryAmount", ot.DiscretionaryAmount); 	dict.Add("Duration", ot.Duration.ToString());	dict.Add("DurationDate", ot.DurationDate.Value);	dict.Add("ECNSweep", ot.ECNSweep.ToString());	dict.Add("IfTouched", ot.IfTouched.ToString());	dict.Add("IfTouchedPrice", ot.IfTouchedPrice);	dict.Add("IfTouchedPriceOffset", ot.IfTouchedPriceOffset);	dict.Add("IfTouchedPriceStyle", ot.IfTouchedPriceStyle.ToString());	dict.Add("LimitPrice", ot.LimitPrice);	dict.Add("LimitPriceOffset", ot.LimitPriceOffset);	dict.Add("LimitPriceStyle", ot.LimitPriceStyle.ToString());	dict.Add("NonDisplay", ot.NonDisplay.ToString());	dict.Add("Peg", ot.Peg.ToString());	dict.Add("Quantity", ot.Quantity);	dict.Add("Route", ot.Route);	dict.Add("ShowOnly", ot.ShowOnly.ToString());	dict.Add("ShowOnlyQuantity", ot.ShowOnlyQuantity);	dict.Add("StopPrice", ot.StopPrice);	dict.Add("StopPriceOffset", ot.StopPriceOffset);	dict.Add("StopPriceStyle", ot.StopPriceStyle.ToString());	dict.Add("Symbol", ot.Symbol);	dict.Add("SymbolType", ot.SymbolType.ToString());	dict.Add("TrailingStop", ot.TrailingStop.ToString());	dict.Add("TrailingStopAmount", ot.TrailingStopAmount);	dict.Add("Type", ot.Type.ToString());		return dict;end;//#############################################################################// AccountsProvider//#############################################################################//--------------------------------------------------------------------------------// Update or Add a specific account using JS//--------------------------------------------------------------------------------method void UpdateAccountJS(tsdata.trading.Account account, bool extendOnly)begin	web.Document.InvokeScript(JS_AP_CALLBACK + "Add", account.AccountID, DictionaryToJSON(AccountToDictionary(account)));end;//--------------------------------------------------------------------------------// Loop through all accounts and send them to JS//--------------------------------------------------------------------------------method void UpdateAccountsJS(string reason, string accountID)vars: int x, int y, Vector jsArr;begin 	web.Document.InvokeScript(JS_AP_CALLBACK + "Clear");	For x = 0 to AccountsProvider1.Count - 1 	begin		UpdateAccountJS( AccountsProvider1.Account[x], false);	end;		 	web.Document.InvokeScript(JS_AP_CALLBACK + "Update", reason, accountID);		end;method Dictionary AccountToDictionary(tsdata.trading.Account acct)vars: Dictionary dict;begin	dict = Dictionary.Create();		dict.Add("AccountID", acct.AccountID);	dict.Add("BDAccountEquity", acct.BDAccountEquity);	dict.Add("BDAccountNetWorth", acct.BDAccountNetWorth);	dict.Add("BDCashBalance", acct.BDCashBalance);	dict.Add("BDDayTradingBuyingPower", acct.BDDayTradingBuyingPower);	dict.Add("BDOptionBuyingPower", acct.BDOptionBuyingPower);	dict.Add("BDOptionLiquidationValue", acct.BDOptionLiquidationValue);	dict.Add("BDOvernightBuyingPower", acct.BDOvernightBuyingPower);	dict.Add("BDUnrealizedPL", acct.BDUnrealizedPL);	dict.Add("CanDayTrade", acct.CanDayTrade.ToString());	dict.Add("FourDaysTradeCount", acct.FourDaysTradeCount);	dict.Add("IsDayTrader", acct.IsDayTrader.ToString());	dict.Add("Name", acct.Name);	dict.Add("OptionsApprovalLevel", acct.OptionsApprovalLevel);	dict.Add("RTAccountEquity", acct.RTAccountEquity);	dict.Add("RTAccountNetWorth", acct.RTAccountNetWorth);	dict.Add("RTCashBalance", acct.RTCashBalance);	dict.Add("RTCostOfPositions", acct.RTCostOfPositions);	dict.Add("RTDayTradingBuyingPower", acct.RTDayTradingBuyingPower);	dict.Add("RTInitialMargin", acct.RTInitialMargin);	dict.Add("RTMaintenanceMargin", acct.RTMaintenanceMargin);	dict.Add("RTOptionBuyingPower", acct.RTOptionBuyingPower);	dict.Add("RTOvernightBuyingPower", acct.RTOvernightBuyingPower);	dict.Add("RTPurchasingPower", acct.RTPurchasingPower);	dict.Add("RTRealizedPL", acct.RTRealizedPL);	dict.Add("RTUnrealizedPL", acct.RTUnrealizedPL);	dict.Add("Status", acct.Status);	dict.Add("TodaysRTTradeEquity", acct.TodaysRTTradeEquity);	dict.Add("Type", acct.Type.ToString());	dict.Add("UnclearedDeposits", acct.UnclearedDeposits);	dict.Add("UnsettledFund", acct.UnsettledFund);		return dict;end;method void AccountsProvider1_StateChanged( elsystem.Object sender, tsdata.common.StateChangedEventArgs args ) var: Dictionary dict;begin	web.Document.InvokeScript(JS_AP_CALLBACK + "Status", args.NewState.ToString(), args.OldState.ToString());end;method void AccountsProvider1_Updated( elsystem.Object sender, tsdata.trading.AccountUpdatedEventArgs args ) begin	if args.Reason <> tsdata.trading.AccountUpdateReason.realtimeupdate then	begin		if displayDebugInfo then			print(args.Reason.ToString());					UpdateAccountJS(args.Account, false);				web.Document.InvokeScript(JS_AP_CALLBACK + "Update", args.Reason.ToString(), args.AccountID);		web.Document.InvokeScript(JS_AP_CALLBACK + "Next");	end;	end;//#############################################################################// Helper methods//#############################################################################//--------------------------------------------------------------------------------// FindField will extract text from a string given an identifier and a delimiter//--------------------------------------------------------------------------------method string FindField(string fields, string identifier, string delimiter)var: string field, int fieldLocation, int delimiterLocation;begin	fieldLocation = instr( fields, identifier );					if fieldLocation > 0 then	begin		field = rightstr( fields, strlen(fields) - (fieldLocation + strlen(identifier) - 1));		delimiterLocation = instr( field, delimiter );				if delimiterLocation > 0 then		begin						field = leftstr(field, delimiterLocation - 1);				end;	end;		return field;end;//--------------------------------------------------------------------------------// ExtractFieldsFromURL //--------------------------------------------------------------------------------method string ExtractFieldsFromURL(string url, string token)vars: string fields, int location, int rightLocation;begin	location = instr( URL, token);		if location > 0 then 	begin		rightLocation = strlen(url) - (location + (strlen(token) - 1));						if rightLocation > 0 then		begin			fields = rightstr(url, rightLocation);		end;	end;		return fields;  end;  //--------------------------------------------------------------------------------// Given a Dictionary, this function will return a JSON string and will // recursively look for Dictionaries nested within Dictionaries and expose its// content.//--------------------------------------------------------------------------------method string DictionaryToJSON( Dictionary dict )   vars: string jsonResult, int x, string itemName, elsystem.Object itemValue;begin	jsonResult = "{"; 		For x = 0 to dict.Keys.Count - 1 	begin		If x > 0 then			jsonResult += ","; 					itemName = dict.Keys[x].ToString();		itemValue = dict.Items[itemName];					if itemValue istype Dictionary then		begin			jsonResult += doublequote + itemName + doublequote + ":" + DictionaryToJSON(itemValue astype Dictionary);		end		else if itemValue istype int or itemValue istype double or itemValue istype float then		begin			jsonResult += doublequote + itemName + doublequote + ":" + itemValue.ToString();		end		else		begin			jsonResult += doublequote + itemName + doublequote + ":" + doublequote + itemValue.ToString() + doublequote;		end;	end;		jsonResult += "}";		return jsonResult;end;  //--------------------------------------------------------------------------------// Given a JSON string, this function will return a Dictionary and will // recursively look for embedded JSON objects nested within the string and expose // its content as an embedded Dictionary.//--------------------------------------------------------------------------------method Dictionary JSONToDictionary(string json)vars: int lastLocation, int firstLocation, int jsObjectLocation, int endOffset, bool isNumber, bool isDecimal,	  Dictionary dict, string decoration, string modifiedJSON, string pair, string key, elsystem.Object value, string strValue;begin	dict = Dictionary.Create(); 		if instr(json, "'") > 0 then		decoration = "'"	else		decoration = doublequote;		lastLocation = instr(json, "{");		modifiedJSON = rightstr(json, strlen(json) - lastLocation); 			while lastLocation <> 0 begin			firstLocation = instr(modifiedJSON, decoration); 		lastLocation = instr(modifiedJSON, "," + decoration);		jsObjectLocation = instr(modifiedJSON, ":{");		endOffset = 0;				// sometimes you will have an embedded json object as part of a field		// if that happens, skip the , + delimiter search are look for the		// end bracket }		if lastLocation = 0 or ((jsObjectLocation > 0) and (jsObjectLocation < lastLocation)) then 		begin			endOffset = 1;			lastLocation = instr(modifiedJSON, "}"); 		end;				if firstLocation <> 0 and lastLocation <> 0 then		begin			isNumber = false;			isDecimal = false;						// extract the pair from the current string			pair = midstr(modifiedJSON, firstLocation, (lastLocation - firstLocation) + endOffset);						// separate the pair including surrounding decorations			key = midstr(pair, 1, instr(pair, decoration + ":"));			strValue = rightstr(pair, strlen(pair) - (strlen(key) + 1));							// remove decorations and extract text 			key = midstr(key, 2, strlen(key) - 2);																	// if the value includes a pair pattern, treat it like another json string			if instr(strValue, "{") = 1 then				value = JSONToDictionary(strValue)			else			begin				// otherwise, check if we've reached the end				if instr(strValue, "}") = strlen(strValue) then					strValue = leftstr(strValue, strlen(strValue) - 1);								// strip the surrounding decorations					if instr(strValue, decoration) = 1 then					strValue = midstr(strValue, 2, strlen(strValue) - 2)				else				begin					// if there are no decorations, then we have a number					isNumber = true;					if instr(strValue, ".") <> 0 then						isDecimal = true;				end;										value = strValue;			end;						// make sure to case the number correctly so that we have a valid number			// in the dictionary			if isNumber = True then			begin				if isDecimal = true then					dict.Add(key, strtonum(strValue) astype double)				else					dict.Add(key, strtonum(strValue) astype int);				end			else				dict.Add(key, value);						end;				// trim the string an continue		modifiedJSON = rightstr(modifiedJSON, strlen(modifiedJSON) - (lastLocation + endOffset));	end;		return dict;	end;//--------------------------------------------------------------------------------// Converts strings and primitive types to a javascript array//--------------------------------------------------------------------------------method string VectorToJSArray(Vector arr)var: string jsResult, int x, bool isString;begin	isString = ((arr.Count > 0) and (arr[0] istype String));	jsResult = "[";	For x = 0 to arr.Count - 1 	begin		If x > 0 then			jsResult += ","; 				if isString = true then				jsResult += doublequote + arr[x].ToString() + doublequote		else			jsResult += arr[x].ToString();	end;		jsResult += "]";		return jsResult;end;method tsdata.trading.OrderAction DictionaryValueToOrderAction(Dictionary dict, string key, tsdata.trading.OrderAction defaultValue)vars: tsdata.trading.OrderAction resultValue, string field;begin	resultValue = defaultValue;		if dict.Contains(key) then	begin		field = dict[key].ToString();				if field = "buy" then			resultValue = tsdata.trading.OrderAction.buy		else if field = "buytocover" then			resultValue = tsdata.trading.OrderAction.buytocover		else if field = "sell" then			resultValue = tsdata.trading.OrderAction.sell				else if field = "sellshort" then			resultValue = tsdata.trading.OrderAction.sellshort			else if field = "unknown" then			resultValue = tsdata.trading.OrderAction.unknown;		end;		return resultValue;end;method tsdata.trading.PegBehavior DictionaryValueToPegBehavior(Dictionary dict, string key, tsdata.trading.PegBehavior defaultValue)vars: tsdata.trading.PegBehavior resultValue, string field;begin	resultValue = defaultValue;	if dict.Contains(key) then	begin		field = dict[key].ToString();				if field = "best" then			resultValue = tsdata.trading.PegBehavior.best		else if field = "mid" then			resultValue = tsdata.trading.PegBehavior.mid		else if field = "off" then			resultValue = tsdata.trading.PegBehavior.off;			end;		return resultValue;end;method tsdata.trading.OrderType DictionaryValueToOrderType(Dictionary dict, string key, tsdata.trading.OrderType defaultValue)vars: tsdata.trading.OrderType resultValue, string field;begin	resultValue = defaultValue;		if dict.Contains(key) then	begin		field = dict[key].ToString();				if field = "limit" then			resultValue = tsdata.trading.OrderType.limit		else if field = "market" then			resultValue = tsdata.trading.OrderType.market		else if field = "stoplimit" then			resultValue = tsdata.trading.OrderType.stoplimit			else if field = "stopmarket" then			resultValue = tsdata.trading.OrderType.stopmarket			else if field = "unknown" then			resultValue = tsdata.trading.OrderType.unknown;			end;	return resultValue;end;	method tsdata.trading.TrailingStopBehavior DictionaryValueToTrailingStopBehavior(Dictionary dict, string key, tsdata.trading.TrailingStopBehavior defaultValue)vars: tsdata.trading.TrailingStopBehavior resultValue, string field;begin	resultValue = defaultValue;		if dict.Contains(key) then	begin		field = dict[key].ToString();				if field = "off" then			resultValue = tsdata.trading.TrailingStopBehavior.off		else if field = "percentage" then			resultValue = tsdata.trading.TrailingStopBehavior.percentage		else if field = "points" then			resultValue = tsdata.trading.TrailingStopBehavior.points;			end;	return resultValue;end;method tsdata.common.SecurityType DictionaryValueToSecurityType(Dictionary dict, string key, tsdata.common.SecurityType defaultValue)vars: tsdata.common.SecurityType resultValue, string field;begin	resultValue = defaultValue;	if dict.Contains(key) then	begin		field = dict[key].ToString();				if field = "bond" then			resultValue =  tsdata.common.SecurityType.bond 		else if field = "cash" then			resultValue = tsdata.common.SecurityType.cash		else if field = "composite" then			resultValue = tsdata.common.SecurityType.composite				else if field = "cpcsymbol" then			resultValue = tsdata.common.SecurityType.cpcsymbol			else if field = "currencyoption" then			resultValue = tsdata.common.SecurityType.currencyoption		else if field = "forex" then			resultValue = tsdata.common.SecurityType.forex		else if field = "future" then			resultValue = tsdata.common.SecurityType.future		else if field = "futureoption" then			resultValue = tsdata.common.SecurityType.futureoption			else if field = "index" then			resultValue = tsdata.common.SecurityType.index			else if field = "indexoption" then			resultValue = tsdata.common.SecurityType.indexoption		else if field = "moneymarketfund" then			resultValue = tsdata.common.SecurityType.moneymarketfund			else if field = "mutualfund" then			resultValue = tsdata.common.SecurityType.mutualfund			else if field = "spread" then			resultValue = tsdata.common.SecurityType.spread			else if field = "stock" then			resultValue = tsdata.common.SecurityType.stock			else if field = "stockoption" then			resultValue = tsdata.common.SecurityType.stockoption		else if field = "unknown" then			resultValue = tsdata.common.SecurityType.unknown;			end;						return resultValue;end;method tsdata.trading.PriceStyle DictionaryValueToPriceStyle(Dictionary dict, string key, tsdata.trading.PriceStyle defaultValue)vars: tsdata.trading.PriceStyle resultValue, string field;begin	resultValue = defaultValue;	if dict.Contains(key) then	begin		field = dict[key].ToString();				if field = "hitortake" then			resultValue =  tsdata.trading.PriceStyle.hitortake 		else if field = "hitortakeplus" then			resultValue = tsdata.trading.PriceStyle.hitortakeplus		else if field = "iftouchplus" then			resultValue = tsdata.trading.PriceStyle.iftouchplus				else if field = "improve" then			resultValue = tsdata.trading.PriceStyle.improve			else if field = "join" then			resultValue = tsdata.trading.PriceStyle.join		else if field = "none" then			resultValue = tsdata.trading.PriceStyle.none		else if field = "parentplus" then			resultValue = tsdata.trading.PriceStyle.parentplus			else if field = "shave" then			resultValue = tsdata.trading.PriceStyle.shave		else if field = "split" then			resultValue = tsdata.trading.PriceStyle.split		else if field = "stopplus" then			resultValue = tsdata.trading.PriceStyle.stopplus;		end;						return resultValue;end;method int DictionaryValueToInt(Dictionary dict, string key, int defaultValue)vars: int resultValue, int tempInt;begin	resultValue = defaultValue;	if dict.Contains(key) then		resultValue = dict[key] astype int;						return resultValue;end;method bool DictionaryValueToBool(Dictionary dict, string key, bool defaultValue)vars: bool resultValue;begin	resultValue = defaultValue;	if dict.Contains(key) then		if lowerstr(dict[key].ToString()) = "true" then			resultValue = true		else			resultValue = false; 						return resultValue;end;method double DictionaryValueToDouble(Dictionary dict, string key, double defaultValue)vars: double resultValue, elsystem.object temp, int tempInt;begin	resultValue = defaultValue;			if dict.Contains(key) then	begin		temp = dict[key];					if temp istype int then		begin			tempInt = temp astype int;			resultValue = tempInt astype double;		end		else			resultValue = dict[key] astype double;			end;				return resultValue;end;method string DictionaryValueToString(Dictionary dict, string key, string defaultValue)vars: string resultValue;begin	resultValue = defaultValue;	if dict.Contains(key) then		resultValue = dict[key].ToString();				return resultValue;end;method elsystem.DateTime DictionaryValueToDateTime(Dictionary dict, string key, elSystem.DateTime defaultValue)vars: elsystem.DateTime resultValue, string temp;begin	resultValue = defaultValue;	if dict.Contains(key) then	begin		temp = dict[key].ToString();				if strlen(temp) > 0 then			resultValue = elSystem.DateTime.Parse(dict[key].ToString());	end;				return resultValue;end;
+//-----------------------------------------------------------------------------
+// Sample Web TradingApp 
+//
+// This sample illustrates the ability for a web browser to interact with 
+// EasyLanguage using hashtags in the url and javascript function calls.
+//-----------------------------------------------------------------------------
+
+using elsystem.windows.forms;
+using elsystem.drawing;
+using elsystem.collections;
+using platform;
+ 
+vars:
+	String url("http://frankts.github.io/tradestation-web-tradingapp-sample/v4/index.html"),  	
+	Form mainForm(null), 
+	WebBrowser web(null),
+	ProgressBar progress(null),
+	bool displayDebugInfo(false),
+	SymbolListDialog slDialog(null),
+	SymbolLinking symbolLink(null),
+	intrabarpersist string currentSymbol(""),
+	string JS_AP_CALLBACK("TradingAppAccountsDelegate"),
+	string JS_OT_CALLBACK("TradingAppOrdersTicketDelegate"),
+	string JS_OP_CALLBACK("TradingAppOrdersDelegate"),
+	string JS_PP_CALLBACK("TradingAppPositionsDelegate"),
+	string JS_SL_CALLBACK("TradingAppSymbolListDelegate"),
+	string JS_SC_CALLBACK("TradingAppSymbolLinkDelegate");
+	
+method void AnalysisTechnique_Initialized( elsystem.Object sender, elsystem.InitializedEventArgs args ) 
+var: int x, Dictionary dict;
+begin
+	currentSymbol = symbol;
+	
+	symbolLink = SymbolLinking.Create();
+	symbolLink.SetContext += symbolLink_SetContext;
+	symbolLink.GetContext += symbolLink_GetContext;
+	
+	web = WebBrowser.Create(100, 100);
+	web.Dock = DockStyle.fill;
+	
+	progress = ProgressBar.Create(1,8); 
+	progress.Dock = DockStyle.bottom;
+	progress.Maximum = 0;
+	progress.Maximum = 100;
+	progress.Value = 100;	
+
+	mainForm = Form.Create("TradingAppJSForm", 100, 100); 
+	mainForm.Dock = DockStyle.right;
+	
+	mainForm.AddControl(progress);
+	mainForm.AddControl(web);	 
+	
+	web.AllowWebBrowserDrop = false;
+	web.ScriptErrorsSuppressed = false;
+	
+	web.DocumentCompleted += web_DocumentCompleted;
+	web.ProgressChanged += web_ProgressChanged; 
+	web.Navigating += web_Navigating; 	
+	
+	AccountsProvider1.statechanged += AccountsProvider1_StateChanged;
+	AccountsProvider1.updated += AccountsProvider1_Updated;
+	
+	web.Navigate(url);
+	
+	mainForm.Show();
+	
+	progress.Visible = false; 	
+	
+	 
+end;
+
+method void web_Navigating( elsystem.Object sender, elsystem.windows.forms.WebBrowserNavigatingEventArgs args )
+var: int hashLocation, int startLocation;
+begin  	
+	if displayDebugInfo then
+		print("URL -> " + args.Url);
+		
+	progress.Visible = true; 
+	
+	if IsHashUrl(args.Url) then
+		EvaluateURL(args.Url);	
+end;
+
+method void web_ProgressChanged ( elsystem.Object sender, elsystem.EventArgs args )
+var:
+	elsystem.windows.forms.WebBrowserProgressChangedEventArgs progArgs;
+begin	
+	progArgs = args astype elsystem.windows.forms.WebBrowserProgressChangedEventArgs;
+		
+	progress.Minimum = 0;
+	progress.Maximum = progArgs.MaximumProgress;
+	
+	if progArgs.CurrentProgress >= 0 then
+		progress.Value = progArgs.CurrentProgress;
+	
+	If progress.Minimum = 0 and progress.Maximum = 0 then
+		progress.Visible = false
+	Else
+		progress.Visible = true;
+end;
+
+method void web_DocumentCompleted (elsystem.Object sender, elsystem.windows.forms.WebBrowserDocumentCompletedEventArgs args )
+begin
+	progress.Visible = false;
+end;
+
+
+method void symbolLink_GetContext ( elsystem.Object sender, platform.SymbolLinkingEventArgs args )
+begin
+	// You will need to manage your own symbol if using SymbolLinking and referring to a symbol
+	// as your current symbol that is different than the keyword "symbol". Keep track of your symbol
+	// by creating your own variable (intrabar persist) and assigning that variable a expressed here.
+
+	args.Symbol = currentSymbol;
+	args.Recalculate = false;
+end;
+
+method void symbolLink_SetContext ( elsystem.Object sender, platform.SymbolLinkingEventArgs args )
+begin
+	currentSymbol = args.Symbol;
+	
+	web.Document.InvokeScript(JS_SC_CALLBACK + "Changed", args.Symbol);
+	web.Document.InvokeScript(JS_SC_CALLBACK + "Next");
+	
+	args.Recalculate = false;
+end;
+
+//--------------------------------------------------------------------------------
+// Check for specific hashtags
+//--------------------------------------------------------------------------------
+method bool IsHashUrl(string url)
+begin
+	//-------------------------------------
+	// Hashtag prefixes
+	//-------------------------------------
+	// #OT = OrderTicket
+	// #OP = OrdersProvider
+	// #PP = PositionsProvider
+	// #AP = AccountsProvider
+	// #FN = Function Call
+
+	return (instr( URL, "#SC:") > 0) or
+		   (instr( URL, "#OT:") > 0) or 
+		   (instr( URL, "#OP:") > 0) or 
+		   (instr( URL, "#PP:") > 0) or 
+		   (instr( URL, "#AP:") > 0) or 
+		   (instr( URL, "#SL:") > 0) or 
+		   (instr( URL, "#FN:") > 0); 
+end;
+
+//--------------------------------------------------------------------------------
+// Inspect the URL for
+//--------------------------------------------------------------------------------
+method bool EvaluateURL(string url)
+vars: string fields, bool res;
+begin
+	if IsHashUrl(url) then
+	begin
+		fields = ExtractFieldsFromURL(url, "#SC:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSSymbolLink(fields);
+			return true;
+		end;	
+	
+		fields = ExtractFieldsFromURL(url, "#AP:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSAccountsProvider(fields);
+			return true;
+		end;
+			
+		fields = ExtractFieldsFromURL(url, "#OT:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSOrderTicket(fields);
+			return true;
+		end;		
+		
+		fields = ExtractFieldsFromURL(url, "#OP:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSOrdersProvider(fields);
+			return true;
+		end;	
+		
+		fields = ExtractFieldsFromURL(url, "#PP:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSPositionsProvider(fields);
+			return true;
+		end;
+		
+		fields = ExtractFieldsFromURL(url, "#SL:");
+		
+		if (strlen(fields) > 0) then
+		begin
+			JSSymbolList(fields);
+			return true;
+		end;		
+	end;
+	
+	return false;
+end;
+
+method void JSSymbolLink(string fields)
+var: string field, Vector jsArr, SymbolContext symbolCtx;
+begin
+	field = FindField(fields, "AN=", ";");
+				
+	if strlen(field) > 0 and upperstr(field) = "SYMBOL" then
+	begin
+		web.Document.InvokeScript(JS_SC_CALLBACK + "Changed", symbol);
+		web.Document.InvokeScript(JS_SC_CALLBACK + "Next");
+	end;
+	
+	field = FindField(fields, "BROADCAST=", ";");
+	
+	if strlen(field) > 0 then
+	begin
+		symbolCtx = SymbolContext.Create();
+		symbolCtx.Symbol = field;
+		symbolLink.SetSymbolContext(symbolCtx);
+		web.Document.InvokeScript(JS_SC_CALLBACK + "Next");
+	end;
+end;
+
+method void JSSymbolList(string fields)
+var: string field, Vector jsArr;
+begin
+	field = FindField(fields, "AN=", ";"); 
+				
+	if strlen(field) > 0 and upperstr(field) = "DISPLAY" then
+	begin
+		slDialog = SymbolListDialog.Create();
+		slDialog.StatusChanged += OnSymbolList_StatusChanged;
+		
+		slDialog.Show();
+	end;
+end;
+
+method void OnSymbolList_StatusChanged( elsystem.Object sender, DialogStatusChangedEventArgs args )
+vars: int x, Vector jsArr; 
+begin
+	jsArr = Vector.Create();
+	
+	For x = 0 to slDialog.Count - 1 
+	begin
+		jsArr.push_back(slDialog[x]);
+	end;	
+	
+	web.Document.InvokeScript(JS_SL_CALLBACK + "Add", VectorToJSArray(jsArr));
+	web.Document.InvokeScript(JS_SL_CALLBACK + "Next");
+end;
+
+method void JSAccountsProvider(string fields)
+var: string field, int x, int y, Vector jsArr;
+begin
+	field = FindField(fields, "AN=", ";"); 
+				
+	if strlen(field) > 0 and upperstr(field) = "ITEMS" then
+	begin
+		UpdateAccountsJS("items", "");	
+	end;
+	
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Next");
+end;
+
+method void JSOrderTicket(string fields)
+vars: string field;
+begin
+	field = FindField(fields, "AN=", ";"); 
+				
+	if strlen(field) > 0 and upperstr(field) = "LOAD" then
+	begin
+		LoadOrderTicketJS(OrderTicket1);
+	end
+	else if strlen(field) > 0 and upperstr(field) = "SEND" then
+	begin
+		field = FindField(fields, "TK=", ";");
+		if strlen(field) > 0 then
+			SendOrderTicketJS(OrderTicket1, field);
+	end; 
+	
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Next");
+end;
+
+method void JSOrdersProvider(string fields)  
+vars: string field, tsdata.trading.Order order;
+begin
+	field = FindField(fields, "AN=", ";"); 
+				
+	if strlen(field) > 0 and upperstr(field) = "LOAD" then
+	begin
+		UpdateOrdersJS("load");
+	end
+	else if strlen(field) > 0 and upperstr(field) = "CANCEL" then
+	begin
+		field = FindField(fields, "ID=", ";");
+		
+		if strlen(field) > 0 then
+		begin
+			order = OrdersProvider1.Order[field];
+			
+			if order <> null then
+			begin
+				order.Cancel();
+				web.Document.InvokeScript(JS_OP_CALLBACK + "Update", "cancel");
+			end;
+		end;
+	end
+	else if strlen(field) > 0 and upperstr(field) = "REPLACE" then
+	begin
+		field = FindField(fields, "ID=", ";");
+			
+		if strlen(field) > 0 then
+		begin
+			order = OrdersProvider1.Order[field];
+			
+			if order <> null then
+			begin
+				field = FindField(fields, "TK=", ";");
+				
+				if strlen(field) > 0 then
+				begin	
+					order.Replace(DictionaryToReplaceTicket(JSONToDictionary(field), tsdata.trading.ReplaceTicket.Create()));					
+					web.Document.InvokeScript(JS_OP_CALLBACK + "Update", "replace");
+				end;
+			end;
+		end;
+	end; 	
+
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Next");	
+end;
+
+method void JSPositionsProvider(string fields)
+vars: string field, tsdata.trading.Position posObj, string posSymbol, string posAccount, int location;
+begin
+	field = FindField(fields, "AN=", ";"); 
+				
+	if strlen(field) > 0 and upperstr(field) = "LOAD" then
+	begin
+		UpdatePositionsJS("load");
+	end
+	else if strlen(field) > 0 and upperstr(field) = "CLOSE" then
+	begin
+		field = FindField(fields, "ID=", ";");
+		
+		if strlen(field) > 0 then
+		begin
+			location = instr(field, "_");
+		
+			if location > 0 then
+			begin
+				posAccount = leftstr(field, location - 1);
+				posSymbol = rightstr(field, strlen(field)- location);
+			end;		
+		
+			posObj = PositionsProvider1.Position[posSymbol, posAccount];
+			
+			if posObj <> null then
+			begin
+				posObj.Close();
+				web.Document.InvokeScript(JS_PP_CALLBACK + "Update", "close");
+			end;
+		end;
+	end;	
+
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Next");	
+end;		
+
+//#############################################################################
+// PositionsProvider
+//#############################################################################
+method string IDForPosition(tsdata.trading.Position posObj)
+begin
+	return posObj.AccountID + "_" + posObj.Symbol;
+end;
+
+method void UpdatePositionsJS(string reason)
+vars: int x, int y, Vector jsArr;
+begin 
+	
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Clear"); 
+
+	For x = 0 to PositionsProvider1.Count - 1 
+	begin
+		UpdatePositionJS( PositionsProvider1.Position[x], false); 
+	end;		 
+	
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Update", "reason");
+end;
+
+method void UpdatePositionJS(tsdata.trading.Position posObj, bool extendOnly) 
+begin
+	web.Document.InvokeScript(JS_PP_CALLBACK + "Add", IDForPosition(posObj), DictionaryToJSON(PositionToDictionary(posObj)));
+end;
+
+method Dictionary PositionToDictionary(tsdata.trading.Position posObj)
+vars: Dictionary dict;
+begin
+	dict = Dictionary.Create();
+	
+	dict.Add("PositionID", IDForPosition(posObj));
+	
+	dict.Add("AccountID", posObj.AccountID);
+	dict.Add("AveragePrice", posObj.AveragePrice);
+	dict.Add("BigPointValue", posObj.BigPointValue);
+	dict.Add("ContractExpirationDate", posObj.ContractExpirationDate.Value);
+	dict.Add("InitialMargin", posObj.InitialMargin);
+	dict.Add("MaintenanceMargin", posObj.MaintenanceMargin);
+	dict.Add("MarketValue", posObj.MarketValue);
+	dict.Add("OpenPL", posObj.OpenPL);
+	dict.Add("OriginalCost", posObj.OriginalCost);
+	dict.Add("PLPerQuantity", posObj.PLPerQuantity);
+	dict.Add("PercentPL", posObj.PercentPL);
+	dict.Add("Quantity", posObj.Quantity);
+	dict.Add("RequiredMargin", posObj.RequiredMargin);
+	dict.Add("Symbol", posObj.Symbol);
+	dict.Add("SymbolType", posObj.SymbolType.ToString());
+	dict.Add("TotalCost", posObj.TotalCost);
+		
+	return dict;
+
+end;
+
+// Method called on PositionsProvider1 Updated event.
+// The sender parameter identifies the object that fires the event.
+// The args parameter contains additional information about the event.
+// NOTE:  Do not modify the method name, return type, or input parameters.
+
+method void PositionsProvider1_Updated( elsystem.Object sender, tsdata.trading.PositionUpdatedEventArgs args ) 
+begin
+	if args.Position <> null then
+	begin		
+		switch ( args.Reason )
+		begin
+			case tsdata.trading.PositionUpdateReason.added: 
+				UpdatePositionJS( args.Position, false);
+				
+			case tsdata.trading.PositionUpdateReason.initialupdate:   
+				UpdatePositionJS( args.Position, false);
+			
+			case tsdata.trading.PositionUpdateReason.realtimeupdate:
+				return;
+				
+			case tsdata.trading.PositionUpdateReason.removed:
+				web.Document.InvokeScript(JS_PP_CALLBACK + "Remove", IDForPosition(args.Position));
+				
+			default:
+				UpdatePositionJS( args.Position, true); 			
+ 		end;
+	
+		web.Document.InvokeScript(JS_PP_CALLBACK + "Update", args.Reason.ToString(), IDForPosition(args.Position));
+		web.Document.InvokeScript(JS_PP_CALLBACK + "Next");
+	end;
+end;
+
+//#############################################################################
+// OrderProvider
+//#############################################################################
+
+//--------------------------------------------------------------------------------
+// Loop through all orders and send them to JS
+//--------------------------------------------------------------------------------
+method void UpdateOrdersJS(string reason)
+vars: int x, int y, Vector jsArr;
+begin 
+
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Clear");
+
+	For x = 0 to OrdersProvider1.Count - 1 
+	begin
+		UpdateOrderJS( OrdersProvider1.Order[x], false);
+	end;		 
+
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Update", reason, "");
+end;
+
+method void UpdateOrderJS(tsdata.trading.Order order, bool extendOnly)
+begin
+	web.Document.InvokeScript(JS_OP_CALLBACK + "Add", order.OrderID, DictionaryToJSON(OrderToDictionary(order)));
+end;
+
+method Dictionary OrderToDictionary(tsdata.trading.Order order)
+vars: Dictionary dict;
+begin
+	dict = Dictionary.Create();
+	
+	dict.Add("OrderID", order.OrderID.ToString());
+	
+	dict.Add("AccountID", order.AccountID);
+	dict.Add("Action", order.Action.ToString());
+	dict.Add("AdvanceOptions", order.AdvanceOptions);
+	dict.Add("AllOrNone", order.AllOrNone.ToString());
+	dict.Add("AvgFilledPrice", order.AvgFilledPrice);
+	dict.Add("BuyMinusSellPlus", order.BuyMinusSellPlus.ToString());
+	dict.Add("Commission", order.Commission);
+	dict.Add("Discretionary", order.Discretionary.ToString());
+	dict.Add("DiscretionaryAmount", order.DiscretionaryAmount);
+	dict.Add("Duration", order.Duration);
+	dict.Add("DurationDate", order.DurationDate.Value);
+	dict.Add("ECNSweep", order.ECNSweep.ToString());
+	dict.Add("EnteredQuantity", order.EnteredQuantity);
+	dict.Add("EnteredTime", order.EnteredTime.Value);
+	dict.Add("FilledQuantity", order.FilledQuantity);
+	dict.Add("FilledTime", order.FilledTime.Value);
+	dict.Add("GeneratingApplication", order.GeneratingApplication.ToString());
+	dict.Add("IfTouched", order.IfTouched.ToString());
+	dict.Add("IfTouchedPrice", order.IfTouchedPrice);
+	dict.Add("IfTouchedPriceOffset", order.IfTouchedPriceOffset);
+	dict.Add("IfTouchedPriceStyle", order.IfTouchedPriceStyle.ToString());
+	dict.Add("LeftQuantity", order.LeftQuantity);
+	dict.Add("LimitPrice", order.LimitPrice);
+	dict.Add("LimitPriceOffset", order.LimitPriceOffset);
+	dict.Add("LimitPriceStyle", order.LimitPriceStyle.ToString());
+	dict.Add("LotSize", order.LotSize);
+	dict.Add("NonDisplay", order.NonDisplay.ToString());
+	dict.Add("OCOGroupID", order.OCOGroupID);
+	dict.Add("OSOParentID", order.OSOParentID);
+	dict.Add("Originator", order.Originator);
+	dict.Add("Peg", order.Peg.ToString());
+	dict.Add("Route", order.Route);
+	dict.Add("ShowOnly", order.ShowOnly.ToString());
+	dict.Add("ShowOnlyQuantity", order.ShowOnlyQuantity);
+	dict.Add("SpreadName", order.SpreadName);
+	dict.Add("State", order.State.ToString());
+	dict.Add("StateDetail", order.StateDetail.ToString());
+	dict.Add("StopPrice", order.StopPrice);
+	dict.Add("StopPriceOffset", order.StopPriceOffset);
+	dict.Add("StopPriceStyle", order.StopPriceStyle.ToString());
+	dict.Add("Symbol", order.Symbol);
+	dict.Add("SymbolExtension", order.SymbolExtension);
+	dict.Add("TrailingStop", order.TrailingStop.ToString());
+	dict.Add("TrailingStopAmount", order.TrailingStopAmount);
+	dict.Add("TrailingStopValue", order.TrailingStopValue);
+	dict.Add("Type", order.Type.ToString());
+		
+	return dict;
+
+end;
+
+// Method called on OrdersProvider1 StateChanged event.
+// The sender parameter identifies the object that fires the event.
+// The args parameter contains additional information about the event.
+// NOTE:  Do not modify the method name, return type, or input parameters.
+
+method void OrdersProvider1_StateChanged( elsystem.Object sender, tsdata.common.StateChangedEventArgs args ) 
+begin
+	{ Insert your EasyLanguage statements below }
+	
+end;
+
+// Method called on OrdersProvider1 Updated event.
+// The sender parameter identifies the object that fires the event.
+// The args parameter contains additional information about the event.
+// NOTE:  Do not modify the method name, return type, or input parameters.
+
+method void OrdersProvider1_Updated( elsystem.Object sender, tsdata.trading.OrderUpdatedEventArgs args ) 
+begin
+	if strlen(args.OrderID) > 0 then
+	begin	
+		if displayDebugInfo then	
+			print(args.Reason.ToString());
+	
+		switch ( args.Reason )
+		begin
+			case tsdata.trading.OrderUpdateReason.added: 
+				UpdateOrderJS( args.Order, false);
+				
+			case tsdata.trading.OrderUpdateReason.statechanged:   
+				UpdateOrderJS( args.Order, false);
+				
+			case tsdata.trading.OrderUpdateReason.removed:
+				web.Document.InvokeScript(JS_OP_CALLBACK + "Remove", args.Order.OrderID);
+				
+			default:
+				UpdateOrderJS( args.Order, true); 			
+ 		end;
+	
+		web.Document.InvokeScript(JS_OP_CALLBACK + "Update", args.Reason.ToString(), args.OrderID);
+		web.Document.InvokeScript(JS_OP_CALLBACK + "Next");
+	end;
+end;
+
+//#############################################################################
+// OrderTicket
+//#############################################################################
+
+method void SendOrderTicketJS(tsdata.trading.OrderTicket ot, string json)
+vars: Dictionary dict;
+begin
+	dict = JSONToDictionary(json);
+	DictionaryToOrderTicket(dict, ot);
+	
+	ot.Send();
+	
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Send");
+end;
+
+method void LoadOrderTicketJS(tsdata.trading.OrderTicket ot)
+begin
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Extend", DictionaryToJSON(OrderTicketToDictionary(ot)));
+	web.Document.InvokeScript(JS_OT_CALLBACK + "Load");
+end;
+
+method tsdata.trading.ReplaceTicket DictionaryToReplaceTicket(Dictionary dict, tsdata.trading.ReplaceTicket rt)
+vars: string field;
+begin
+	rt.IfTouched 					= DictionaryValueToBool(dict, "IfTouched", rt.IfTouched);			
+	rt.IfTouchedPrice 				= DictionaryValueToDouble(dict, "IfTouchedPrice", rt.IfTouchedPrice);	
+	rt.IfTouchedPriceOffset 		= DictionaryValueToInt(dict, "IfTouchedPriceOffset", rt.IfTouchedPriceOffset);
+	rt.IfTouchedPriceStyle 			= DictionaryValueToPriceStyle(dict, "IfTouchedPriceStyle", rt.IfTouchedPriceStyle);
+	rt.LimitPrice 					= DictionaryValueToDouble(dict, "LimitPrice", rt.LimitPrice);	
+	rt.LimitPriceOffset 			= DictionaryValueToInt(dict, "LimitPriceOffset", rt.LimitPriceOffset);	
+	rt.LimitPriceStyle 				= DictionaryValueToPriceStyle(dict, "LimitPriceStyle", rt.LimitPriceStyle);
+	rt.Quantity 					= DictionaryValueToInt(dict, "Quantity", rt.Quantity);
+	rt.StopPrice 					= DictionaryValueToDouble(dict, "StopPrice", rt.StopPrice);	
+	rt.StopPriceOffset 				= DictionaryValueToInt(dict, "StopPriceOffset", rt.StopPriceOffset);	
+	rt.StopPriceStyle 				= DictionaryValueToPriceStyle(dict, "StopPriceStyle", rt.StopPriceStyle);
+	rt.TrailingStop					= DictionaryValueToTrailingStopBehavior(dict, "TrailingStop", rt.TrailingStop);	
+	rt.TrailingStopAmount 			= DictionaryValueToDouble(dict, "TrailingStopAmount", rt.TrailingStopAmount);		
+	rt.Type							= DictionaryValueToOrderType( dict, "Type", rt.Type);
+	
+	return rt;
+end;
+
+method tsdata.trading.OrderTicket DictionaryToOrderTicket(Dictionary dict, tsdata.trading.OrderTicket ot)
+vars: string field;
+begin
+	ot.Account 						= DictionaryValueToString(dict, "Account", ot.Account);	 
+	ot.Action 						= DictionaryValueToOrderAction(dict, "Action", ot.Action);
+	ot.AllOrNone 					= DictionaryValueToBool(dict, "AllOrNone", ot.AllOrNone);		
+	ot.BuyMinusSellPlus 			= DictionaryValueToBool(dict, "BuyMinusSellPlus", ot.BuyMinusSellPlus);
+ 	ot.ConvertInvalidStopToMarket 	= DictionaryValueToBool(dict, "ConvertInvalidStopToMarket", ot.ConvertInvalidStopToMarket);	
+	ot.Discretionary 				= DictionaryValueToBool(dict, "Discretionary", ot.Discretionary);			
+	ot.DiscretionaryAmount 			= DictionaryValueToDouble(dict, "DiscretionaryAmount", ot.DiscretionaryAmount);			
+	ot.Duration 					= DictionaryValueToString(dict, "Duration", ot.Duration);			
+	ot.DurationDate 				= DictionaryValueToDateTime(dict, "DurationDate", ot.DurationDate);
+	ot.ECNSweep 					= DictionaryValueToBool(dict, "ECNSweep", ot.ECNSweep);	
+	ot.IfTouched 					= DictionaryValueToBool(dict, "IfTouched", ot.IfTouched);			
+	ot.IfTouchedPrice 				= DictionaryValueToDouble(dict, "IfTouchedPrice", ot.IfTouchedPrice);	
+	ot.IfTouchedPriceOffset 		= DictionaryValueToInt(dict, "IfTouchedPriceOffset", ot.IfTouchedPriceOffset);
+	ot.IfTouchedPriceStyle 			= DictionaryValueToPriceStyle(dict, "IfTouchedPriceStyle", ot.IfTouchedPriceStyle);
+	ot.LimitPrice 					= DictionaryValueToDouble(dict, "LimitPrice", ot.LimitPrice);	
+	ot.LimitPriceOffset 			= DictionaryValueToInt(dict, "LimitPriceOffset", ot.LimitPriceOffset);	
+	ot.LimitPriceStyle 				= DictionaryValueToPriceStyle(dict, "LimitPriceStyle", ot.LimitPriceStyle);
+	ot.NonDisplay 					= DictionaryValueToBool(dict, "NonDisplay", ot.NonDisplay);
+	ot.Peg 							= DictionaryValueToPegBehavior(dict, "Peg", ot.Peg);
+	ot.Quantity 					= DictionaryValueToInt(dict, "Quantity", ot.Quantity);
+	ot.Route 						= DictionaryValueToString(dict, "Route", ot.Route);
+	ot.ShowOnly 					= DictionaryValueToBool(dict, "ShowOnly", ot.ShowOnly);
+	ot.ShowOnlyQuantity 			= DictionaryValueToInt(dict, "ShowOnlyQuantity", ot.ShowOnlyQuantity);	
+	ot.StopPrice 					= DictionaryValueToDouble(dict, "StopPrice", ot.StopPrice);	
+	ot.StopPriceOffset 				= DictionaryValueToInt(dict, "StopPriceOffset", ot.StopPriceOffset);	
+	ot.StopPriceStyle 				= DictionaryValueToPriceStyle(dict, "StopPriceStyle", ot.StopPriceStyle);
+	ot.Symbol 						= DictionaryValueToString(dict, "Symbol", ot.Symbol);
+	ot.SymbolType 					= DictionaryValueToSecurityType(dict, "SymbolType", ot.SymbolType);
+	ot.TrailingStop					= DictionaryValueToTrailingStopBehavior(dict, "TrailingStop", ot.TrailingStop);
+	ot.TrailingStopAmount 			= DictionaryValueToDouble(dict, "TrailingStopAmount", ot.TrailingStopAmount);		
+	ot.Type							= DictionaryValueToOrderType( dict, "Type", ot.Type);
+	
+	return ot;
+end;
+
+method Dictionary OrderTicketToDictionary(tsdata.trading.OrderTicket ot)
+vars: Dictionary dict;
+begin
+	dict = Dictionary.Create();
+	
+	dict.Add("TicketType", ot.TicketType.ToString());
+	dict.Add("OrderPlacementEnabled", ot.OrderPlacementEnabled.ToString());
+	dict.Add("Account", ot.Account);
+	dict.Add("Action", ot.Action.ToString());
+	// dict.Add("ActivationRules", ot.ActivationRules.ToString());
+	dict.Add("AllOrNone", ot.AllOrNone.ToString());
+	dict.Add("BuyMinusSellPlus", ot.BuyMinusSellPlus.ToString());
+	dict.Add("ConvertInvalidStopToMarket", ot.ConvertInvalidStopToMarket.ToString());
+	dict.Add("Discretionary", ot.Discretionary.ToString());
+	dict.Add("DiscretionaryAmount", ot.DiscretionaryAmount); 
+	dict.Add("Duration", ot.Duration.ToString());
+	dict.Add("DurationDate", ot.DurationDate.Value);
+	dict.Add("ECNSweep", ot.ECNSweep.ToString());
+	dict.Add("IfTouched", ot.IfTouched.ToString());
+	dict.Add("IfTouchedPrice", ot.IfTouchedPrice);
+	dict.Add("IfTouchedPriceOffset", ot.IfTouchedPriceOffset);
+	dict.Add("IfTouchedPriceStyle", ot.IfTouchedPriceStyle.ToString());
+	dict.Add("LimitPrice", ot.LimitPrice);
+	dict.Add("LimitPriceOffset", ot.LimitPriceOffset);
+	dict.Add("LimitPriceStyle", ot.LimitPriceStyle.ToString());
+	dict.Add("NonDisplay", ot.NonDisplay.ToString());
+	dict.Add("Peg", ot.Peg.ToString());
+	dict.Add("Quantity", ot.Quantity);
+	dict.Add("Route", ot.Route);
+	dict.Add("ShowOnly", ot.ShowOnly.ToString());
+	dict.Add("ShowOnlyQuantity", ot.ShowOnlyQuantity);
+	dict.Add("StopPrice", ot.StopPrice);
+	dict.Add("StopPriceOffset", ot.StopPriceOffset);
+	dict.Add("StopPriceStyle", ot.StopPriceStyle.ToString());
+	dict.Add("Symbol", ot.Symbol);
+	dict.Add("SymbolType", ot.SymbolType.ToString());
+	dict.Add("TrailingStop", ot.TrailingStop.ToString());
+	dict.Add("TrailingStopAmount", ot.TrailingStopAmount);
+	dict.Add("Type", ot.Type.ToString());
+	
+	return dict;
+
+end;
+
+//#############################################################################
+// AccountsProvider
+//#############################################################################
+
+//--------------------------------------------------------------------------------
+// Update or Add a specific account using JS
+//--------------------------------------------------------------------------------
+method void UpdateAccountJS(tsdata.trading.Account account, bool extendOnly)
+begin
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Add", account.AccountID, DictionaryToJSON(AccountToDictionary(account)));
+end;
+
+//--------------------------------------------------------------------------------
+// Loop through all accounts and send them to JS
+//--------------------------------------------------------------------------------
+method void UpdateAccountsJS(string reason, string accountID)
+vars: int x, int y, Vector jsArr;
+begin 
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Clear");
+
+	For x = 0 to AccountsProvider1.Count - 1 
+	begin
+		UpdateAccountJS( AccountsProvider1.Account[x], false);
+	end;		 
+
+	web.Document.InvokeScript(JS_AP_CALLBACK + "Update", reason, accountID);		
+end;
+
+method Dictionary AccountToDictionary(tsdata.trading.Account acct)
+vars: Dictionary dict;
+begin
+	dict = Dictionary.Create();
+	
+	dict.Add("AccountID", acct.AccountID);
+	dict.Add("BDAccountEquity", acct.BDAccountEquity);
+	dict.Add("BDAccountNetWorth", acct.BDAccountNetWorth);
+	dict.Add("BDCashBalance", acct.BDCashBalance);
+	dict.Add("BDDayTradingBuyingPower", acct.BDDayTradingBuyingPower);
+	dict.Add("BDOptionBuyingPower", acct.BDOptionBuyingPower);
+	dict.Add("BDOptionLiquidationValue", acct.BDOptionLiquidationValue);
+	dict.Add("BDOvernightBuyingPower", acct.BDOvernightBuyingPower);
+	dict.Add("BDUnrealizedPL", acct.BDUnrealizedPL);
+	dict.Add("CanDayTrade", acct.CanDayTrade.ToString());
+	dict.Add("FourDaysTradeCount", acct.FourDaysTradeCount);
+	dict.Add("IsDayTrader", acct.IsDayTrader.ToString());
+	dict.Add("Name", acct.Name);
+	dict.Add("OptionsApprovalLevel", acct.OptionsApprovalLevel);
+	dict.Add("RTAccountEquity", acct.RTAccountEquity);
+	dict.Add("RTAccountNetWorth", acct.RTAccountNetWorth);
+	dict.Add("RTCashBalance", acct.RTCashBalance);
+	dict.Add("RTCostOfPositions", acct.RTCostOfPositions);
+	dict.Add("RTDayTradingBuyingPower", acct.RTDayTradingBuyingPower);
+	dict.Add("RTInitialMargin", acct.RTInitialMargin);
+	dict.Add("RTMaintenanceMargin", acct.RTMaintenanceMargin);
+	dict.Add("RTOptionBuyingPower", acct.RTOptionBuyingPower);
+	dict.Add("RTOvernightBuyingPower", acct.RTOvernightBuyingPower);
+	dict.Add("RTPurchasingPower", acct.RTPurchasingPower);
+	dict.Add("RTRealizedPL", acct.RTRealizedPL);
+	dict.Add("RTUnrealizedPL", acct.RTUnrealizedPL);
+	dict.Add("Status", acct.Status);
+	dict.Add("TodaysRTTradeEquity", acct.TodaysRTTradeEquity);
+	dict.Add("Type", acct.Type.ToString());
+	dict.Add("UnclearedDeposits", acct.UnclearedDeposits);
+	dict.Add("UnsettledFund", acct.UnsettledFund);
+	
+	return dict;
+
+end;
+
+method void AccountsProvider1_StateChanged( elsystem.Object sender, tsdata.common.StateChangedEventArgs args ) 
+var: Dictionary dict;
+begin
+	If web.Document <> null then
+		web.Document.InvokeScript(JS_AP_CALLBACK + "Status", args.NewState.ToString(), args.OldState.ToString());
+end;
+
+method void AccountsProvider1_Updated( elsystem.Object sender, tsdata.trading.AccountUpdatedEventArgs args ) 
+begin
+	if args.Reason <> tsdata.trading.AccountUpdateReason.realtimeupdate and web.Document <> null then
+	begin
+		if displayDebugInfo then
+			print(args.Reason.ToString());
+			
+		UpdateAccountJS(args.Account, false);
+		
+		web.Document.InvokeScript(JS_AP_CALLBACK + "Update", args.Reason.ToString(), args.AccountID);
+		web.Document.InvokeScript(JS_AP_CALLBACK + "Next");
+	end;	
+end;
+
+//#############################################################################
+// Helper methods
+//#############################################################################
+
+//--------------------------------------------------------------------------------
+// FindField will extract text from a string given an identifier and a delimiter
+//--------------------------------------------------------------------------------
+method string FindField(string fields, string identifier, string delimiter)
+var: string field, int fieldLocation, int delimiterLocation;
+begin
+	fieldLocation = instr( fields, identifier );
+				
+	if fieldLocation > 0 then
+	begin
+		field = rightstr( fields, strlen(fields) - (fieldLocation + strlen(identifier) - 1));
+		delimiterLocation = instr( field, delimiter );
+		
+		if delimiterLocation > 0 then
+		begin			
+			field = leftstr(field, delimiterLocation - 1);		
+		end;
+	end;
+	
+	return field;
+end;
+
+//--------------------------------------------------------------------------------
+// ExtractFieldsFromURL 
+//--------------------------------------------------------------------------------
+method string ExtractFieldsFromURL(string url, string token)
+vars: string fields, int location, int rightLocation;
+begin
+	location = instr( URL, token);
+	
+	if location > 0 then 
+	begin
+		rightLocation = strlen(url) - (location + (strlen(token) - 1));	
+			
+		if rightLocation > 0 then
+		begin
+			fields = rightstr(url, rightLocation);
+		end;
+	end;
+	
+	return fields;  
+end; 
+ 
+//--------------------------------------------------------------------------------
+// Given a Dictionary, this function will return a JSON string and will 
+// recursively look for Dictionaries nested within Dictionaries and expose its
+// content.
+//--------------------------------------------------------------------------------
+method string DictionaryToJSON( Dictionary dict )   
+vars: string jsonResult, int x, string itemName, elsystem.Object itemValue;
+begin
+	jsonResult = "{"; 
+	
+	For x = 0 to dict.Keys.Count - 1 
+	begin
+		If x > 0 then
+			jsonResult += ","; 
+			
+		itemName = dict.Keys[x].ToString();
+		itemValue = dict.Items[itemName];
+			
+		if itemValue istype Dictionary then
+		begin
+			jsonResult += doublequote + itemName + doublequote + ":" + DictionaryToJSON(itemValue astype Dictionary);
+		end
+		else if itemValue istype int or itemValue istype double or itemValue istype float then
+		begin
+			jsonResult += doublequote + itemName + doublequote + ":" + itemValue.ToString();
+		end
+		else
+		begin
+			jsonResult += doublequote + itemName + doublequote + ":" + doublequote + itemValue.ToString() + doublequote;
+		end;
+	end;
+	
+	jsonResult += "}";
+	
+	return jsonResult;
+end;  
+
+//--------------------------------------------------------------------------------
+// Given a JSON string, this function will return a Dictionary and will 
+// recursively look for embedded JSON objects nested within the string and expose 
+// its content as an embedded Dictionary.
+//--------------------------------------------------------------------------------
+method Dictionary JSONToDictionary(string json)
+vars: int lastLocation, int firstLocation, int jsObjectLocation, int endOffset, bool isNumber, bool isDecimal,
+	  Dictionary dict, string decoration, string modifiedJSON, string pair, string key, elsystem.Object value, string strValue;
+begin
+	dict = Dictionary.Create(); 
+	
+	if instr(json, "'") > 0 then
+		decoration = "'"
+	else
+		decoration = doublequote;
+	
+	lastLocation = instr(json, "{");
+	
+	modifiedJSON = rightstr(json, strlen(json) - lastLocation); 	
+	
+	while lastLocation <> 0 begin	
+		firstLocation = instr(modifiedJSON, decoration); 
+		lastLocation = instr(modifiedJSON, "," + decoration);
+		jsObjectLocation = instr(modifiedJSON, ":{");
+		endOffset = 0;
+		
+		// sometimes you will have an embedded json object as part of a field
+		// if that happens, skip the , + delimiter search are look for the
+		// end bracket }
+		if lastLocation = 0 or ((jsObjectLocation > 0) and (jsObjectLocation < lastLocation)) then 
+		begin
+			endOffset = 1;
+			lastLocation = instr(modifiedJSON, "}"); 
+		end;
+		
+		if firstLocation <> 0 and lastLocation <> 0 then
+		begin
+			isNumber = false;
+			isDecimal = false;
+			
+			// extract the pair from the current string
+			pair = midstr(modifiedJSON, firstLocation, (lastLocation - firstLocation) + endOffset);
+			
+			// separate the pair including surrounding decorations
+			key = midstr(pair, 1, instr(pair, decoration + ":"));
+			strValue = rightstr(pair, strlen(pair) - (strlen(key) + 1));
+				
+			// remove decorations and extract text 
+			key = midstr(key, 2, strlen(key) - 2);								
+						
+			// if the value includes a pair pattern, treat it like another json string
+			if instr(strValue, "{") = 1 then
+				value = JSONToDictionary(strValue)
+			else
+			begin
+				// otherwise, check if we've reached the end
+				if instr(strValue, "}") = strlen(strValue) then
+					strValue = leftstr(strValue, strlen(strValue) - 1);
+				
+				// strip the surrounding decorations	
+				if instr(strValue, decoration) = 1 then
+					strValue = midstr(strValue, 2, strlen(strValue) - 2)
+				else
+				begin
+					// if there are no decorations, then we have a number
+					isNumber = true;
+					if instr(strValue, ".") <> 0 then
+						isDecimal = true;
+				end;	
+					
+				value = strValue;
+			end;
+			
+			// make sure to case the number correctly so that we have a valid number
+			// in the dictionary
+			if isNumber = True then
+			begin
+				if isDecimal = true then
+					dict.Add(key, strtonum(strValue) astype double)
+				else
+					dict.Add(key, strtonum(strValue) astype int);	
+			end
+			else
+				dict.Add(key, value);				
+		end;
+		
+		// trim the string an continue
+		modifiedJSON = rightstr(modifiedJSON, strlen(modifiedJSON) - (lastLocation + endOffset));
+	end;
+	
+	return dict;	
+end;
+
+//--------------------------------------------------------------------------------
+// Converts strings and primitive types to a javascript array
+//--------------------------------------------------------------------------------
+method string VectorToJSArray(Vector arr)
+var: string jsResult, int x, bool isString;
+begin
+	isString = ((arr.Count > 0) and (arr[0] istype String));
+	jsResult = "[";
+
+	For x = 0 to arr.Count - 1 
+	begin
+		If x > 0 then
+			jsResult += ","; 
+		
+		if isString = true then	
+			jsResult += doublequote + arr[x].ToString() + doublequote
+		else
+			jsResult += arr[x].ToString();
+	end;
+	
+	jsResult += "]";
+	
+	return jsResult;
+end;
+
+method tsdata.trading.OrderAction DictionaryValueToOrderAction(Dictionary dict, string key, tsdata.trading.OrderAction defaultValue)
+vars: tsdata.trading.OrderAction resultValue, string field;
+begin
+	resultValue = defaultValue;
+	
+	if dict.Contains(key) then
+	begin
+		field = dict[key].ToString();
+		
+		if field = "buy" then
+			resultValue = tsdata.trading.OrderAction.buy
+		else if field = "buytocover" then
+			resultValue = tsdata.trading.OrderAction.buytocover
+		else if field = "sell" then
+			resultValue = tsdata.trading.OrderAction.sell		
+		else if field = "sellshort" then
+			resultValue = tsdata.trading.OrderAction.sellshort	
+		else if field = "unknown" then
+			resultValue = tsdata.trading.OrderAction.unknown;	
+	end;
+	
+	return resultValue;
+end;
+
+method tsdata.trading.PegBehavior DictionaryValueToPegBehavior(Dictionary dict, string key, tsdata.trading.PegBehavior defaultValue)
+vars: tsdata.trading.PegBehavior resultValue, string field;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+	begin
+		field = dict[key].ToString();
+		
+		if field = "best" then
+			resultValue = tsdata.trading.PegBehavior.best
+		else if field = "mid" then
+			resultValue = tsdata.trading.PegBehavior.mid
+		else if field = "off" then
+			resultValue = tsdata.trading.PegBehavior.off;		
+	end;
+	
+	return resultValue;
+end;
+
+method tsdata.trading.OrderType DictionaryValueToOrderType(Dictionary dict, string key, tsdata.trading.OrderType defaultValue)
+vars: tsdata.trading.OrderType resultValue, string field;
+begin
+	resultValue = defaultValue;
+	
+	if dict.Contains(key) then
+	begin
+		field = dict[key].ToString();
+		
+		if field = "limit" then
+			resultValue = tsdata.trading.OrderType.limit
+		else if field = "market" then
+			resultValue = tsdata.trading.OrderType.market
+		else if field = "stoplimit" then
+			resultValue = tsdata.trading.OrderType.stoplimit	
+		else if field = "stopmarket" then
+			resultValue = tsdata.trading.OrderType.stopmarket	
+		else if field = "unknown" then
+			resultValue = tsdata.trading.OrderType.unknown;		
+	end;
+
+	return resultValue;
+end;
+	
+method tsdata.trading.TrailingStopBehavior DictionaryValueToTrailingStopBehavior(Dictionary dict, string key, tsdata.trading.TrailingStopBehavior defaultValue)
+vars: tsdata.trading.TrailingStopBehavior resultValue, string field;
+begin
+	resultValue = defaultValue;
+	
+	if dict.Contains(key) then
+	begin
+		field = dict[key].ToString();
+		
+		if field = "off" then
+			resultValue = tsdata.trading.TrailingStopBehavior.off
+		else if field = "percentage" then
+			resultValue = tsdata.trading.TrailingStopBehavior.percentage
+		else if field = "points" then
+			resultValue = tsdata.trading.TrailingStopBehavior.points;		
+	end;
+
+	return resultValue;
+end;
+
+method tsdata.common.SecurityType DictionaryValueToSecurityType(Dictionary dict, string key, tsdata.common.SecurityType defaultValue)
+vars: tsdata.common.SecurityType resultValue, string field;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+	begin
+		field = dict[key].ToString();
+		
+		if field = "bond" then
+			resultValue =  tsdata.common.SecurityType.bond 
+		else if field = "cash" then
+			resultValue = tsdata.common.SecurityType.cash
+		else if field = "composite" then
+			resultValue = tsdata.common.SecurityType.composite		
+		else if field = "cpcsymbol" then
+			resultValue = tsdata.common.SecurityType.cpcsymbol	
+		else if field = "currencyoption" then
+			resultValue = tsdata.common.SecurityType.currencyoption
+		else if field = "forex" then
+			resultValue = tsdata.common.SecurityType.forex
+		else if field = "future" then
+			resultValue = tsdata.common.SecurityType.future
+		else if field = "futureoption" then
+			resultValue = tsdata.common.SecurityType.futureoption	
+		else if field = "index" then
+			resultValue = tsdata.common.SecurityType.index	
+		else if field = "indexoption" then
+			resultValue = tsdata.common.SecurityType.indexoption
+		else if field = "moneymarketfund" then
+			resultValue = tsdata.common.SecurityType.moneymarketfund	
+		else if field = "mutualfund" then
+			resultValue = tsdata.common.SecurityType.mutualfund	
+		else if field = "spread" then
+			resultValue = tsdata.common.SecurityType.spread	
+		else if field = "stock" then
+			resultValue = tsdata.common.SecurityType.stock	
+		else if field = "stockoption" then
+			resultValue = tsdata.common.SecurityType.stockoption
+		else if field = "unknown" then
+			resultValue = tsdata.common.SecurityType.unknown;		
+	end;
+					
+	return resultValue;
+end;
+
+method tsdata.trading.PriceStyle DictionaryValueToPriceStyle(Dictionary dict, string key, tsdata.trading.PriceStyle defaultValue)
+vars: tsdata.trading.PriceStyle resultValue, string field;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+	begin
+		field = dict[key].ToString();
+		
+		if field = "hitortake" then
+			resultValue =  tsdata.trading.PriceStyle.hitortake 
+		else if field = "hitortakeplus" then
+			resultValue = tsdata.trading.PriceStyle.hitortakeplus
+		else if field = "iftouchplus" then
+			resultValue = tsdata.trading.PriceStyle.iftouchplus		
+		else if field = "improve" then
+			resultValue = tsdata.trading.PriceStyle.improve	
+		else if field = "join" then
+			resultValue = tsdata.trading.PriceStyle.join
+		else if field = "none" then
+			resultValue = tsdata.trading.PriceStyle.none
+		else if field = "parentplus" then
+			resultValue = tsdata.trading.PriceStyle.parentplus	
+		else if field = "shave" then
+			resultValue = tsdata.trading.PriceStyle.shave
+		else if field = "split" then
+			resultValue = tsdata.trading.PriceStyle.split
+		else if field = "stopplus" then
+			resultValue = tsdata.trading.PriceStyle.stopplus;	
+	end;
+					
+	return resultValue;
+end;
+
+method int DictionaryValueToInt(Dictionary dict, string key, int defaultValue)
+vars: int resultValue, int tempInt;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+		resultValue = dict[key] astype int;
+					
+	return resultValue;
+end;
+
+method bool DictionaryValueToBool(Dictionary dict, string key, bool defaultValue)
+vars: bool resultValue;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+		if lowerstr(dict[key].ToString()) = "true" then
+			resultValue = true
+		else
+			resultValue = false; 
+					
+	return resultValue;
+end;
+
+method double DictionaryValueToDouble(Dictionary dict, string key, double defaultValue)
+vars: double resultValue, elsystem.object temp, int tempInt;
+begin
+	resultValue = defaultValue;
+		
+	if dict.Contains(key) then
+	begin
+		temp = dict[key];	
+		
+		if temp istype int then
+		begin
+			tempInt = temp astype int;
+			resultValue = tempInt astype double;
+		end
+		else
+			resultValue = dict[key] astype double;		
+	end;	
+		
+	return resultValue;
+end;
+
+method string DictionaryValueToString(Dictionary dict, string key, string defaultValue)
+vars: string resultValue;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+		resultValue = dict[key].ToString();
+			
+	return resultValue;
+end;
+
+method elsystem.DateTime DictionaryValueToDateTime(Dictionary dict, string key, elSystem.DateTime defaultValue)
+vars: elsystem.DateTime resultValue, string temp;
+begin
+	resultValue = defaultValue;
+
+	if dict.Contains(key) then
+	begin
+		temp = dict[key].ToString();
+		
+		if strlen(temp) > 0 then
+			resultValue = elSystem.DateTime.Parse(dict[key].ToString());
+	end;
+			
+	return resultValue;
+end;
